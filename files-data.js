@@ -1,10 +1,10 @@
 // ⚠ 本文件由 scan.js 自动生成，请勿手动编辑（改了会被下次扫描覆盖）。
-// 生成时间：2026-09-18T10:00:15.292Z
+// 生成时间：2026-09-18T13:01:33.169Z
 // 想让自己的页面自定义分类/图标/简介，请改那个 html 的 <head> 里的 wb-* 标签。
 window.__GAMES_INDEX__ = {
-  "generatedAt": "2026-09-18T10:00:15.292Z",
+  "generatedAt": "2026-09-18T13:01:33.169Z",
   "siteName": "Mini Games",
-  "repo": "",
+  "repo": "yezihack/mini-games",
   "count": 3,
   "categories": [
     "游戏",
@@ -28,7 +28,7 @@ window.__GAMES_INDEX__ = {
       "author": "",
       "group": "games",
       "size": 25808,
-      "mtime": "2026-09-18T04:13:49.281Z",
+      "mtime": "2026-09-18T13:01:27.909Z",
       "order": 10
     },
     {
@@ -49,7 +49,7 @@ window.__GAMES_INDEX__ = {
       "author": "",
       "group": "games",
       "size": 15375,
-      "mtime": "2026-09-18T09:59:59.727Z",
+      "mtime": "2026-09-18T13:01:27.909Z",
       "order": 20
     },
     {
@@ -70,7 +70,7 @@ window.__GAMES_INDEX__ = {
       "author": "",
       "group": "games",
       "size": 48750,
-      "mtime": "2026-09-18T04:13:50.163Z",
+      "mtime": "2026-09-18T13:01:27.909Z",
       "order": 20
     }
   ]
