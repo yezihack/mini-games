@@ -1,16 +1,40 @@
-// ⚠ 本文件由 scan.js 自动生成，请勿手动编辑（改了会被下次扫描覆盖）。
-// 生成时间：2026-09-18T10:00:15.292Z
-// 想让自己的页面自定义分类/图标/简介，请改那个 html 的 <head> 里的 wb-* 标签。
+// ⚠ 本文件由 scan.js 自动生成，请勿手动编辑（改了也会被下次扫描覆盖）。
+// 生成时间：2026-09-18T13:30:57.671Z
+// 想让某个人页面自定义分类/图标/简介，请改那个 html 的 <head> 里的 wb-* 标签。
 window.__GAMES_INDEX__ = {
-  "generatedAt": "2026-09-18T10:00:15.292Z",
-  "siteName": "Mini Games",
-  "repo": "",
-  "count": 3,
+  "generatedAt": "2026-09-18T13:30:57.671Z",
+  "rootName": "mini-games",
+  "scanDirs": [
+    ".",
+    "games"
+  ],
+  "count": 5,
   "categories": [
     "游戏",
     "学习训练"
   ],
   "items": [
+    {
+      "file": "voxel-craft.html",
+      "rel": "games/voxel-craft.html",
+      "url": "games/voxel-craft.html",
+      "title": "方块世界 · Voxel Craft",
+      "desc": "纯手写 WebGL 的 3D 方块沙盒：无限程序化地形、挖掘与放置、飞行与重力、第一人称视角，无任何外部依赖离线可玩。",
+      "category": "游戏",
+      "icon": "⛏️",
+      "tags": [
+        "3D",
+        "沙盒",
+        "方块",
+        "WebGL",
+        "第一人称",
+        "建造"
+      ],
+      "group": "games",
+      "size": 61061,
+      "mtime": "2026-09-18T12:56:18.022Z",
+      "order": 5
+    },
     {
       "file": "block-game.html",
       "rel": "games/block-game.html",
@@ -25,7 +49,6 @@ window.__GAMES_INDEX__ = {
         "键盘",
         "触屏"
       ],
-      "author": "",
       "group": "games",
       "size": 25808,
       "mtime": "2026-09-18T04:13:49.281Z",
@@ -46,11 +69,28 @@ window.__GAMES_INDEX__ = {
         "触屏",
         "经典"
       ],
-      "author": "",
       "group": "games",
       "size": 15375,
       "mtime": "2026-09-18T09:59:59.727Z",
       "order": 20
+    },
+    {
+      "file": "_template.html",
+      "rel": "games/_template.html",
+      "url": "games/_template.html",
+      "title": "我的小游戏",
+      "desc": "用一句话说清玩法，比如：方向键控制小球吃满全屏的豆子。",
+      "category": "游戏",
+      "icon": "🎮",
+      "tags": [
+        "休闲",
+        "键盘",
+        "触屏"
+      ],
+      "group": "games",
+      "size": 2879,
+      "mtime": "2026-09-18T04:56:38.082Z",
+      "order": 100
     },
     {
       "file": "typing-game.html",
@@ -67,7 +107,6 @@ window.__GAMES_INDEX__ = {
         "连击",
         "记忆"
       ],
-      "author": "",
       "group": "games",
       "size": 48750,
       "mtime": "2026-09-18T04:13:50.163Z",
