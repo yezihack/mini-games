@@ -134,6 +134,7 @@ function collectFiles() {
         walk(full, depth + 1);
       } else if (ent.isFile()) {
         if (!/\.html?$/i.test(ent.name)) continue;
+        if (/^_template(\.|$)/i.test(ent.name)) continue; // 贡献者模板不进清单
         if (path.dirname(full) === ROOT && EXCLUDE_FILES.has(ent.name.toLowerCase())) continue;
         found.add(path.resolve(full));
       }

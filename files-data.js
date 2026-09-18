@@ -1,14 +1,14 @@
 // ⚠ 本文件由 scan.js 自动生成，请勿手动编辑（改了也会被下次扫描覆盖）。
-// 生成时间：2026-09-18T13:33:44.939Z
+// 生成时间：2026-09-18T13:41:13.577Z
 // 想让某个人页面自定义分类/图标/简介，请改那个 html 的 <head> 里的 wb-* 标签。
 window.__GAMES_INDEX__ = {
-  "generatedAt": "2026-09-18T13:33:44.939Z",
+  "generatedAt": "2026-09-18T13:41:13.577Z",
   "rootName": "mini-games",
   "scanDirs": [
     ".",
     "games"
   ],
-  "count": 5,
+  "count": 4,
   "categories": [
     "游戏",
     "学习训练"
@@ -73,24 +73,6 @@ window.__GAMES_INDEX__ = {
       "size": 15375,
       "mtime": "2026-09-18T09:59:59.727Z",
       "order": 20
-    },
-    {
-      "file": "_template.html",
-      "rel": "games/_template.html",
-      "url": "games/_template.html",
-      "title": "我的小游戏",
-      "desc": "用一句话说清玩法，比如：方向键控制小球吃满全屏的豆子。",
-      "category": "游戏",
-      "icon": "🎮",
-      "tags": [
-        "休闲",
-        "键盘",
-        "触屏"
-      ],
-      "group": "games",
-      "size": 2879,
-      "mtime": "2026-09-18T04:56:38.082Z",
-      "order": 100
     },
     {
       "file": "typing-game.html",

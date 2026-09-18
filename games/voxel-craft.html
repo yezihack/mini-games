@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>方块世界 · Voxel Craft</title>
+<!-- ===== 导航站约定标签：新增页面时照抄这一段即可被 index.html 自动收录 ===== -->
+<meta name="description" content="纯手写 WebGL 的 3D 方块沙盒：无限程序化地形、挖掘与放置、飞行与重力、第一人称视角，无任何外部依赖离线可玩。">
+<meta name="wb-category" content="游戏">
+<meta name="wb-icon" content="⛏️">
+<meta name="wb-tags" content="3D,沙盒,方块,WebGL,第一人称,建造">
+<meta name="wb-order" content="5">
+<style>
+  :root{
+    --bg:#070a12;
+    --panel:rgba(12,17,28,.72);
+    --panel-brd:rgba(255,255,255,.12);
+    --txt:#e8eefc;
+    --dim:#8494b3;
+    --accent:#43e0ff;
+    --ok:#5ee08a;
+    --warn:#ffd166;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;background:var(--bg)}
+  body{
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--txt);
+  }
+  #gl{position:fixed;inset:0;display:block;width:100%;height:100%}
+  .layer{position:fixed;inset:0;pointer-events:none}
+
+  /* ---------- 准星 ---------- */
+  #cross{
+    position:fixed;left:50%;top:50%;width:22px;height:22px;transform:translate(-50%,-50%);
+    pointer-events:none;opacity:.9;transition:transform .08s ease-out;
+  }
+  #cross.hit{transform:translate(-50%,-50%) scale(1.28)}
+  #cross i{position:absolute;background:#fff;box-shadow:0 0 3px rgba(0,0,0,.9);border-radius:1px}
+  #cross i:nth-child(1){left:50%;top:0;width:2px;height:8px;margin-left:-1px}
+  #cross i:nth-child(2){left:50%;bottom:0;width:2px;height:8px;margin-left:-1px}
+  #cross i:nth-child(3){top:50%;left:0;height:2px;width:8px;margin-top:-1px}
+  #cross i:nth-child(4){top:50%;right:0;height:2px;width:8px;margin-top:-1px}
+
+  /* ---------- HUD ---------- */
+  .hud{
+    position:fixed;left:14px;top:14px;display:flex;flex-direction:column;gap:8px;
+    font-size:12px;line-height:1.55;pointer-events:none;
+  }
+  .card{
+    background:var(--panel);border:1px solid var(--panel-brd);border-radius:12px;
+    padding:9px 12px;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.45);
+  }
+  .card b{color:var(--accent);font-weight:600}
+  .card kbd{
+    display:inline-block;min-width:18px;text-align:center;
+    background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);
+    border-bottom-width:2px;border-radius:5px;padding:0 5px;font-size:11px;font-family:inherit;
+  }
+  .dim{color:var(--dim)}
+
+  /* ---------- 物品栏 ---------- */
+  #hotbar{
+    position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+    display:flex;gap:7px;padding:8px;border-radius:16px;
+    background:var(--panel);border:1px solid var(--panel-brd);
+    backdrop-filter:blur(10px);box-shadow:0 14px 40px rgba(0,0,0,.5);
+  }
+  .slot{
+    position:relative;width:52px;height:52px;border-radius:11px;cursor:pointer;
+    border:2px solid rgba(255,255,255,.10);
+    background:linear-gradient(160deg,rgba(255,255,255,.10),rgba(0,0,0,.28));
+    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;
+    transition:transform .12s,border-color .12s;
+  }
+  .slot:hover{transform:translateY(-3px)}
+  .slot.on{border-color:var(--accent);box-shadow:0 0 0 2px rgba(67,224,255,.22),0 0 18px rgba(67,224,255,.35)}
+  .slot .sw{
+    width:24px;height:24px;border-radius:5px;
+    box-shadow:inset 0 -6px 0 rgba(0,0,0,.22), inset 0 4px 0 rgba(255,255,255,.20);
+  }
+  .slot .nm{font-size:9.5px;color:var(--dim);letter-spacing:.2px}
+  .slot .key{
+    position:absolute;left:4px;top:2px;font-size:9px;color:rgba(255,255,255,.45);
+  }
+  .slot.on .nm{color:var(--txt)}
+
+  /* ---------- 开始/暂停遮罩 ---------- */
+  #veil{
+    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(900px 600px at 50% 30%,rgba(67,224,255,.10),transparent 60%),rgba(4,7,13,.86);
+    backdrop-filter:blur(6px);z-index:20;
+  }
+  #veil.hide{display:none}
+  .panel{
+    width:min(560px,92vw);border-radius:22px;padding:28px 30px;text-align:center;
+    background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+    border:1px solid var(--panel-brd);box-shadow:0 30px 90px rgba(0,0,0,.7);
+  }
+  .panel h1{
+    margin:0 0 6px;font-size:30px;letter-spacing:1px;
+    background:linear-gradient(135deg,#43e0ff,#a855f7);-webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;
+  }
+  .panel .tagline{color:var(--dim);font-size:13px;margin-bottom:20px}
+  .keys{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:8px 16px;text-align:left;
+    font-size:12.5px;color:var(--dim);margin-bottom:22px;
+  }
+  .keys div{display:flex;gap:8px;align-items:center}
+  .go{
+    display:inline-block;padding:13px 34px;border-radius:13px;cursor:pointer;font-size:15px;font-weight:600;
+    color:#04121a;background:linear-gradient(135deg,#43e0ff,#7dd3fc);border:0;
+    box-shadow:0 12px 30px rgba(67,224,255,.35);transition:.18s;font-family:inherit;
+  }
+  .go:hover{transform:translateY(-2px);box-shadow:0 16px 38px rgba(67,224,255,.5)}
+  .go:active{transform:translateY(0)}
+  .hint{margin-top:14px;font-size:11.5px;color:var(--dim)}
+
+  /* ---------- 触屏控制 ---------- */
+  .touch{display:none}
+  body.touch .touch{display:block}
+  #stick{
+    position:fixed;left:22px;bottom:96px;width:118px;height:118px;border-radius:50%;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);z-index:10;
+  }
+  #stick .knob{
+    position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;
+    background:linear-gradient(160deg,rgba(255,255,255,.55),rgba(255,255,255,.28));
+    box-shadow:0 6px 18px rgba(0,0,0,.4);
+  }
+  #tbtns{
+    position:fixed;right:20px;bottom:100px;display:flex;flex-direction:column;gap:10px;align-items:flex-end;z-index:10;
+  }
+  .tb{
+    width:58px;height:58px;border-radius:50%;border:1px solid rgba(255,255,255,.18);
+    background:rgba(255,255,255,.09);color:var(--txt);font-size:12px;font-family:inherit;cursor:pointer;
+    backdrop-filter:blur(8px);
+  }
+  .tb:active{background:rgba(255,255,255,.22)}
+  .tb.wide{width:auto;padding:0 16px;border-radius:14px;height:44px}
+  #joy2{
+    position:fixed;right:20px;bottom:300px;width:100px;height:100px;border-radius:50%;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);z-index:10;
+  }
+  #joy2 .knob{
+    position:absolute;left:50%;top:50%;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;
+    background:linear-gradient(160deg,rgba(255,255,255,.5),rgba(255,255,255,.25));
+    box-shadow:0 6px 18px rgba(0,0,0,.4);
+  }
+  @media (max-width:820px){
+    .keys{grid-template-columns:1fr}
+    .slot{width:44px;height:44px}
+    .slot .sw{width:20px;height:20px}
+  }
+  /* 手机横屏时 HUD 太挤，弱化说明卡 */
+  @media (max-height:520px){
+    .hud .card:nth-child(n+3){display:none}
+    #hotbar{bottom:8px;padding:6px}
+    .slot{width:42px;height:42px}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+
+<!-- 准星 -->
+<div id="cross"><i></i><i></i><i></i><i></i></div>
+
+<!-- HUD -->
+<div class="hud">
+  <div class="card">
+    <b>⛏️ 方块世界</b>
+    <div class="dim" id="stat">---</div>
+  </div>
+  <div class="card" id="helpCard">
+    <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动 · <kbd>Space</kbd> 跳跃/上升</div>
+    <div><kbd>Shift</kbd> 下降/潜行 · <kbd>F</kbd> 飞行 <span id="flyTag" class="dim">(关)</span></div>
+    <div>左键挖掘 · 右键放置 · <kbd>1</kbd>-<kbd>9</kbd>/滚轮 换方块</div>
+    <div>按住<kbd>右键</kbd>拖拽可调整视角 · <kbd>R</kbd> 回家</div>
+    <div><kbd>Esc</kbd> 暂停 · 地形可无限行走</div>
+  </div>
+</div>
+
+<!-- 物品栏 -->
+<div id="hotbar"></div>
+
+<!-- 触屏控件 -->
+<div id="stick" class="touch"><div class="knob"></div></div>
+<div id="joy2" class="touch"><div class="knob"></div></div>
+<div id="tbtns" class="touch">
+  <button class="tb" id="btnUp">↑</button>
+  <button class="tb" id="btnDown">↓</button>
+  <button class="tb wide" id="btnFly">飞行</button>
+  <button class="tb wide" id="btnJump">跳</button>
+</div>
+
+<!-- 开始 / 暂停面板 -->
+<div id="veil">
+  <div class="panel">
+    <h1>方块世界</h1>
+    <div class="tagline">手写 WebGL 体素引擎 · 无外部依赖 · 离线可玩</div>
+    <div class="keys">
+      <div><kbd>W A S D</kbd> 四向移动</div>
+      <div><kbd>空格</kbd> 跳跃 / 飞行上升</div>
+      <div><kbd>Shift</kbd> 潜行 / 飞行下降</div>
+      <div><kbd>F</kbd> 切换飞行模式</div>
+      <div><kbd>鼠标左键</kbd> 挖掘方块</div>
+      <div><kbd>鼠标右键</kbd> 放置方块</div>
+      <div><kbd>右键拖拽</kbd> 调整视角</div>
+      <div><kbd>滚轮 / 1-9</kbd> 切换方块</div>
+      <div><kbd>R</kbd> 回到出生点</div>
+      <div><kbd>Esc</kbd> 暂停 / 解锁鼠标</div>
+    </div>
+    <button class="go" id="btnStart">开始游戏</button>
+    <div class="hint" id="veilHint">点击后会锁定鼠标，按 <b>Esc</b> 可以随时退出</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================================
+ *  方块世界 · Voxel Craft
+ *  纯手写 WebGL 体素沙盒 —— 无 Three.js / 无外部资源
+ *
+ *  架构：
+ *    World       : Uint8Array 体素存储，按 (y*D + z)*W + x 线性索引
+ *    TerrainGen  : 多倍频值噪声 → 高度场 + 生物群系着色
+ *    Mesher      : 对每个区块做面剔除，输出合并后的顶点/法线/AO/光照缓冲
+ *    Renderer    : 单套 shader（方块 + 高亮线框），透视矩阵 + 视锥剔除
+ *    Player      : AABB 逐轴扫掠碰撞，重力/跳跃/飞行，DDA 射线拾取
+ * ========================================================================== */
+
+/* ============================== 常量配置 ============================== */
+const W = 96, H = 64, D = 96;        // 世界尺寸（局部地形）
+const CX = 4, CY = 4, CZ = 4;        // 区块划分 4×4×4
+const CW = W / CX, CH = H / CY, CD = D / CZ;  // 单区块尺寸 24×16×24
+const SEA = 16;                      // 海平面
+const REACH = 6.5;                   // 交互距离
+const G = 26;                        // 重力加速度
+const JUMP_V = 9.0;                  // 起跳速度
+const EYE = 1.62;                    // 视点高度
+const PW = 0.30;                     // 玩家半径（AABB 半宽）
+
+/* 方块表：id → 属性
+ * tex 用程序化噪声生成像素纹理，颜色决定观感；solid 决定是否碰撞/遮挡 */
+const BLOCKS = [
+  null,
+  { name:'草方块', top:[ 96,168, 74], side:[124,150, 78], bot:[134,102, 68], n:'草' },
+  { name:'泥土',   top:[134,102, 68], side:[134,102, 68], bot:[134,102, 68], n:'土' },
+  { name:'石头',   top:[132,134,138], side:[132,134,138], bot:[132,134,138], n:'石' },
+  { name:'圆石',   top:[110,112,116], side:[110,112,116], bot:[110,112,116], n:'圆' },
+  { name:'沙子',   top:[223,209,152], side:[223,209,152], bot:[223,209,152], n:'沙' },
+  { name:'原木',   top:[164,129, 80], side:[ 96, 68, 42], bot:[164,129, 80], n:'木' },
+  { name:'树叶',   top:[ 62,140, 62], side:[ 56,128, 56], bot:[ 62,140, 62], n:'叶' },
+  { name:'木板',   top:[176,140, 88], side:[176,140, 88], bot:[176,140, 88], n:'板' },
+  { name:'砖块',   top:[164, 84, 70], side:[164, 84, 70], bot:[164, 84, 70], n:'砖' },
+  { name:'玻璃',   top:[190,220,240], side:[190,220,240], bot:[190,220,240], n:'玻', alpha:.45 },
+  { name:'水',     top:[ 56,118,200], side:[ 50,106,186], bot:[ 50,106,186], n:'水', alpha:.62, liquid:true },
+  { name:'雪块',   top:[238,243,250], side:[238,243,250], bot:[238,243,250], n:'雪' },
+  { name:'黑曜石', top:[ 34, 28, 48], side:[ 34, 28, 48], bot:[ 34, 28, 48], n:'曜' },
+  { name:'萤石',   top:[252,228,140], side:[248,214,120], bot:[248,214,120], n:'萤', light:1 },
+  { name:'南瓜',   top:[226,146, 46], side:[216,132, 40], bot:[226,146, 46], n:'瓜' },
+];
+const SOLID = {};                    // id → 是否实体
+BLOCKS.forEach((b, i) => { if (b) SOLID[i] = !b.liquid; });
+
+/* 物品栏（9 格），值 = 方块 id */
+const HOTBAR = [1, 3, 4, 2, 8, 6, 7, 9, 14];
+
+/* ============================== 数学工具 ============================== */
+const M4 = {
+  ident: () => new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]),
+  persp(fovy, asp, n, f) {
+    const t = 1 / Math.tan(fovy / 2), nf = 1 / (n - f);
+    return new Float32Array([
+      t / asp, 0, 0, 0,
+      0, t, 0, 0,
+      0, 0, (f + n) * nf, -1,
+      0, 0, 2 * f * n * nf, 0,
+    ]);
+  },
+  ortho(l, r, b, t, n, f) {
+    return new Float32Array([
+      2/(r-l),0,0,0, 0,2/(t-b),0,0, 0,0,2/(n-f),0,
+      -(r+l)/(r-l), -(t+b)/(t-b), (f+n)/(n-f), 1,
+    ]);
+  },
+  /* 由 yaw/pitch + 位置构造视图矩阵（先平移后旋转） */
+  view(px, py, pz, yaw, pitch) {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const cp = Math.cos(pitch), sp = Math.sin(pitch);
+    // 相机基向量：右 R、上 U、前 F(=视线方向)
+    const fx = -sy * cp, fy = sp, fz = -cy * cp;
+    const rx = cy, ry = 0, rz = -sy;
+    const ux = ry * fz - rz * fy, uy = rz * fx - rx * fz, uz = rx * fy - ry * fx;
+    return {
+      view: new Float32Array([
+        rx, ux, -fx, 0,
+        ry, uy, -fy, 0,
+        rz, uz, -fz, 0,
+        -(rx*px + ry*py + rz*pz),
+        -(ux*px + uy*py + uz*pz),
+         (fx*px + fy*py + fz*pz), 1,
+      ]),
+      dir: [fx, fy, fz],
+    };
+  },
+  mul(a, b) {   // a * b
+    const o = new Float32Array(16);
+    for (let i = 0; i < 4; i++)
+      for (let j = 0; j < 4; j++) {
+        let s = 0;
+        for (let k = 0; k < 4; k++) s += a[k * 4 + j] * b[i * 4 + k];
+        o[i * 4 + j] = s;
+      }
+    return o;
+  },
+};
+
+/* 确定性伪随机 + 值噪声 */
+function hash2(x, y, seed) {
+  let h = x * 374761393 + y * 668265263 + seed * 144665;
+  h = (h ^ (h >> 13)) * 1274126177;
+  h = h ^ (h >> 16);
+  return ((h >>> 0) % 100000) / 100000;
+}
+function smooth(t) { return t * t * (3 - 2 * t); }
+function noise2(x, y, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const a = hash2(xi, yi, seed), b = hash2(xi + 1, yi, seed);
+  const c = hash2(xi, yi + 1, seed), d = hash2(xi + 1, yi + 1, seed);
+  const u = smooth(xf), v = smooth(yf);
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+function fbm(x, y, seed, oct = 4) {
+  let s = 0, amp = 1, f = 1, norm = 0;
+  for (let i = 0; i < oct; i++) {
+    s += noise2(x * f, y * f, seed + i * 97) * amp;
+    norm += amp; amp *= 0.5; f *= 2;
+  }
+  return s / norm;
+}
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+
+/* ============================== 世界数据 ============================== */
+/* 地形以「一块 W×D 的基础地图」为模板，横向按需平铺 —— 视觉上无限延伸。
+ * 因此 getBlock 对水平坐标做取模，垂直方向不循环（避免脚下突然出现方块）。 */
+const world = new Uint8Array(W * H * D);
+const IDX = (x, y, z) => (y * D + z) * W + x;
+
+/* 把任意横向坐标折回基础地图范围（支持负数） */
+const wrapX = (x) => ((x % W) + W) % W;
+const wrapZ = (z) => ((z % D) + D) % D;
+
+function getBlock(x, y, z) {
+  if (y < 0) return 3;                 // 世界底部视为实心，防止从下方掉出
+  if (y >= H) return 0;                // 上方是天空
+  return world[IDX(wrapX(x | 0), y | 0, wrapZ(z | 0))];
+}
+/* 写出方块：记录到「覆盖层」，不改动基础地形（保证模板可复用） */
+const edits = new Map();               // key = `${x},${y},${z}` → id
+const EKEY = (x, y, z) => x + ',' + y + ',' + z;
+
+function setBlock(x, y, z, id) {
+  if (y < 0 || y >= H) return;
+  const xi = x | 0, yi = y | 0, zi = z | 0;
+  const base = world[IDX(wrapX(xi), yi, wrapZ(zi))];
+  if (id === base) edits.delete(EKEY(xi, yi, zi));
+  else edits.set(EKEY(xi, yi, zi), id);
+  dirtyChunkOf(x, y, z);
+}
+/* 直接写基础地形模板。仅在地形生成阶段使用 —— 生成完就固化成「模板」，
+ * 之后玩家的改动一律走 setBlock 记到覆盖层，这样地形可以无限平铺复用。 */
+function setBase(x, y, z, id) {
+  if (x < 0 || x >= W || y < 0 || y >= H || z < 0 || z >= D) return;
+  world[IDX(x | 0, y | 0, z | 0)] = id;
+}
+
+/* 合并读：覆盖层优先。烘焙进区块几何时用这个 */
+function getEffective(x, y, z) {
+  if (y < 0) return 3;
+  if (y >= H) return 0;
+  const e = edits.get(EKEY(x | 0, y | 0, z | 0));
+  if (e !== undefined) return e;
+  return world[IDX(wrapX(x | 0), y | 0, wrapZ(z | 0))];
+}
+const isSolid = (id) => id > 0 && SOLID[id] === true;
+/* 不透明 = 实体且非玻璃/水（决定邻面是否剔除） */
+const isOpaque = (id) => id > 0 && id !== 10 && id !== 11;
+
+/* ------------------------------ 地形生成 ------------------------------ */
+function generate(seed) {
+  const heights = new Int16Array(W * D);
+  for (let z = 0; z < D; z++) {
+    for (let x = 0; x < W; x++) {
+      // 大陆起伏 + 细节 + 山脊
+      const base = fbm(x * 0.018, z * 0.018, seed, 4);
+      const detail = fbm(x * 0.075, z * 0.075, seed + 501, 3);
+      const ridge = 1 - Math.abs(fbm(x * 0.030, z * 0.030, seed + 911, 3) * 2 - 1);
+      let h = SEA + 2
+        + (base - 0.5) * 22
+        + (detail - 0.5) * 4
+        + Math.pow(ridge, 3) * 11 * (base > 0.52 ? 1 : 0.25);
+      heights[z * W + x] = clamp(Math.round(h), 4, H - 8);
+    }
+  }
+
+  for (let z = 0; z < D; z++) {
+    for (let x = 0; x < W; x++) {
+      const h = heights[z * W + x];
+      // 生物群系：温度（纬度向）+ 湿度（噪声）
+      const temp = 1 - z / D * 0.75 + (fbm(x * 0.02, z * 0.02, seed + 77, 2) - 0.5) * 0.5;
+      const wet = fbm(x * 0.025, z * 0.025, seed + 313, 2);
+      const desert = wet < 0.38 && temp > 0.5;
+      const snowy = temp < 0.34;
+
+      for (let y = 0; y <= h; y++) {
+        let id;
+        if (y === 0) id = 13;                                // 基岩层黑曜石
+        else if (y === h) {
+          if (h <= SEA) id = 5;                              // 水下沙
+          else if (snowy) id = 12;
+          else if (desert) id = 5;
+          else id = 1;
+        } else if (y > h - 4) {
+          id = desert ? 5 : 2;                               // 表层 3 格
+        } else {
+          // 石头里掺一点矿脉般的圆石
+          id = fbm(x * 0.14, (z + y * 7) * 0.14, seed + 4242, 2) > 0.62 ? 4 : 3;
+        }
+        world[IDX(x, y, z)] = id;
+      }
+      // 水填充
+      if (h < SEA) for (let y = h + 1; y <= SEA; y++) world[IDX(x, y, z)] = 11;
+    }
+  }
+
+  // ---------------------------- 植树 ----------------------------
+  let trees = 0;
+  for (let z = 3; z < D - 3; z++) {
+    for (let x = 3; x < W - 3; x++) {
+      const h = heights[z * W + x];
+      if (h <= SEA + 1) continue;                       // 水里不长
+      if (getBlock(x, h, z) !== 1 && getBlock(x, h, z) !== 12) continue;
+      if (hash2(x, z, seed + 1234) > 0.012) continue;    // 稀疏分布
+      // 简单间距检查，避免树挤在一起
+      let ok = true;
+      for (let dz = -2; dz <= 2 && ok; dz++)
+        for (let dx = -2; dx <= 2 && ok; dx++)
+          if (getBlock(x + dx, getBlock(x + dx, h + 4, z + dz) ? h + 4 : h, z + dz) === 6) ok = false;
+      if (!ok) continue;
+
+      const th = 4 + Math.floor(hash2(x + 9, z + 9, seed) * 3);
+      for (let i = 1; i <= th; i++) setBase(x, h + i, z, 6);
+      // 树冠：球形，半径 2
+      const top = h + th;
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dz = -2; dz <= 2; dz++)
+          for (let dx = -2; dx <= 2; dx++) {
+            const r = Math.abs(dx) + Math.abs(dy) + Math.abs(dz);
+            if (r > 3) continue;
+            if (r === 3 && hash2(dx + x, dz + z, seed + dy) > 0.5) continue;
+            const bx = x + dx, by = top + dy, bz = z + dz;
+            if (getBlock(bx, by, bz) === 0) setBase(bx, by, bz, 7);
+          }
+      trees++;
+    }
+  }
+
+  // -------------------------- 萤石小径 --------------------------
+  return { heights, trees };
+}
+
+/* 出生点：地表最高的干燥位置 */
+function findSpawn() {
+  let bx = W >> 1, bz = D >> 1, best = -1;
+  for (let z = 8; z < D - 8; z++)
+    for (let x = 8; x < W - 8; x++) {
+      let y = H - 1;
+      while (y > 0 && getBlock(x, y, z) === 0) y--;
+      if (getBlock(x, y, z) === 11) continue;
+      const d = Math.abs(x - W / 2) + Math.abs(z - D / 2);
+      if (y > best && d < 22) { best = y; bx = x; bz = z; }
+    }
+  let y = H - 1;
+  while (y > 0 && getBlock(bx, y, bz) === 0) y--;
+  return [bx + 0.5, y + 2.2, bz + 0.5];
+}
+
+/* ============================== 网格构建 ============================== */
+/* 每个区块一份 VAO 数据；存放 position/normal/color/ao 交错缓冲
+ * 区块不再固定在世界原点，而是记录「世界坐标的区块索引」(gx,gz)。
+ * 玩家走远后整个窗口平移，只为新进入视野的一圈重建几何。 */
+const chunks = [];
+const VIEW_CX = 4;                   // 视野半径（区块数）
+const VIEW_CZ = 4;
+let anchorGX = 0, anchorGZ = 0;      // 当前窗口左上角对应的世界区块索引
+
+function makeChunk(gx, gy, gz) {
+  return {
+    gx, gy, gz,
+    cx: gx - anchorGX, cy: gy, cz: gz - anchorGZ,
+    vbo: null, ibo: null, count: 0, dirty: true,
+    min: [gx * CW, gy * CH, gz * CD],
+    max: [(gx + 1) * CW, (gy + 1) * CH, (gz + 1) * CD],
+  };
+}
+function initChunks(centerGX = 0, centerGZ = 0) {
+  chunks.length = 0;
+  anchorGX = centerGX - (VIEW_CX >> 1);
+  anchorGZ = centerGZ - (VIEW_CZ >> 1);
+  for (let cy = 0; cy < CY; cy++)
+    for (let gz = anchorGZ; gz < anchorGZ + VIEW_CZ; gz++)
+      for (let gx = anchorGX; gx < anchorGX + VIEW_CX; gx++)
+        chunks.push(makeChunk(gx, cy, gz));
+}
+
+/* 窗口平移：把移出视野的区块对象回收，改坐标后标记为待重建。
+ * 关键在于「复用」—— 只有真正新进入视野的那一圈才需要重建几何。
+ *
+ * 做法：以世界坐标 (gx,gz) 为键，把仍然留在新窗口内的区块登记进 map；
+ * 然后顺序遍历新窗口的每个 (gx,gz)，能在 map 里找到就直接复用原对象
+ * （几何不动），找不到就从「已被淘汰的对象池」里取一个改写坐标并标脏。
+ * 对象总数恒定 = VIEW_CX*VIEW_CZ*CY，既不新建也不销毁。 */
+function shiftChunks(dGX, dGZ) {
+  anchorGX += dGX; anchorGZ += dGZ;
+
+  const map = new Map();                 // 'gx,gz,cy' → chunk
+  const pool = [];                       // 被淘汰、可改写的区块对象
+  for (const c of chunks) {
+    const inWindow = c.gx >= anchorGX && c.gx < anchorGX + VIEW_CX &&
+                     c.gz >= anchorGZ && c.gz < anchorGZ + VIEW_CZ;
+    if (inWindow) map.set(c.gx + ',' + c.gz + ',' + c.cy, c);
+    else pool.push(c);
+  }
+
+  const out = new Array(chunks.length);
+  let pi = 0;
+  for (let cy = 0; cy < CY; cy++)
+    for (let gz = anchorGZ; gz < anchorGZ + VIEW_CZ; gz++)
+      for (let gx = anchorGX; gx < anchorGX + VIEW_CX; gx++) {
+        const i = (cy * VIEW_CZ + (gz - anchorGZ)) * VIEW_CX + (gx - anchorGX);
+        const hit = map.get(gx + ',' + gz + ',' + cy);
+        if (hit) { out[i] = hit; continue; }          // 复用：几何完全不用重建
+
+        // 取一个淘汰对象，改写它的世界坐标并标脏
+        let c = null;
+        for (let k = pi; k < pool.length; k++) {
+          if (pool[k] && pool[k].cy === cy) { c = pool[k]; pool[k] = null; pi = k; break; }
+        }
+        if (!c) {                                     // 兜底：理论上不会走到
+          c = makeChunk(gx, cy, gz);
+        } else {
+          c.gx = gx; c.gz = gz; c.cy = cy;
+          c.min = [gx * CW, cy * CH, gz * CD];
+          c.max = [(gx + 1) * CW, (cy + 1) * CH, (gz + 1) * CD];
+          c.dirty = true;
+        }
+        c.cx = gx - anchorGX; c.cz = gz - anchorGZ;
+        out[i] = c;
+      }
+  for (let i = 0; i < out.length; i++) if (out[i]) chunks[i] = out[i];
+}
+
+/* 找出世界坐标 (x,y,z) 落在哪个区块，并标脏 */
+function dirtyChunkOf(x, y, z) {
+  const gx = Math.floor(x / CW), gy = Math.floor(y / CH), gz = Math.floor(z / CD);
+  for (const c of chunks) {
+    if (c.gx === gx && c.cy === gy && c.gz === gz) { c.dirty = true; return; }
+  }
+  /* 落在窗口外（例如在视野边缘外挖方块）—— 遍历所有可能命中的邻接格子 */
+  for (const c of chunks) {
+    if (c.cy !== gy) continue;
+    if (x + 1 > c.min[0] && x < c.max[0] && z + 1 > c.min[2] && z < c.max[2]) {
+      c.dirty = true;
+    }
+  }
+}
+
+/* 六个面：法线 + 四角偏移（逆时针，从外部看） */
+const FACES = [
+  { n: [ 1, 0, 0], v: [[1,0,1],[1,0,0],[1,1,0],[1,1,1]], shade: 0.80 }, // +X
+  { n: [-1, 0, 0], v: [[0,0,0],[0,0,1],[0,1,1],[0,1,0]], shade: 0.80 }, // -X
+  { n: [ 0, 1, 0], v: [[0,1,1],[1,1,1],[1,1,0],[0,1,0]], shade: 1.00 }, // +Y 顶面最亮
+  { n: [ 0,-1, 0], v: [[0,0,0],[1,0,0],[1,0,1],[0,0,1]], shade: 0.55 }, // -Y 底面最暗
+  { n: [ 0, 0, 1], v: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]], shade: 0.88 }, // +Z
+  { n: [ 0, 0,-1], v: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]], shade: 0.72 }, // -Z
+];
+
+/* 顶点环境光遮蔽：查 3 个邻居的占据情况 */
+function vertexAO(side1, side2, corner) {
+  if (side1 && side2) return 0.45;
+  return 1 - (side1 + side2 + corner) * 0.16;
+}
+
+/* 构建一个区块的几何：面剔除 + AO 烘焙，一次性写入 VBO */
+function buildChunk(c) {
+  const pos = [], col = [], ao = [];
+  const x0 = c.min[0], y0 = c.min[1], z0 = c.min[2];
+
+  for (let y = y0; y < c.max[1]; y++)
+    for (let z = z0; z < c.max[2]; z++)
+      for (let x = x0; x < c.max[0]; x++) {
+        const id = getEffective(x, y, z);
+        if (!id) continue;
+        const B = BLOCKS[id];
+        for (let f = 0; f < 6; f++) {
+          const F = FACES[f];
+          const nx = x + F.n[0], ny = y + F.n[1], nz = z + F.n[2];
+          const nb = getEffective(nx, ny, nz);
+          if (isOpaque(nb)) continue;              // 被邻居挡住 → 剔面
+          if (nb === id && (id === 10 || id === 11)) continue; // 同类玻璃/水不画内部面
+
+          // 面颜色：顶/底面用 top/bot，侧面用 side
+          const base = F.n[1] > 0 ? B.top : F.n[1] < 0 ? B.bot : B.side;
+          const s = F.shade;
+
+          // AO：沿面切线方向取 3 个邻居
+          const ax = F.n[0] !== 0 ? 1 : 0, ay = F.n[1] !== 0 ? 1 : 0, az = F.n[2] !== 0 ? 1 : 0;
+          const t1 = [ay ? 1 : 0, az ? 1 : 0, ax ? 1 : 0];   // 第一条切线
+          const t2 = [az ? 1 : 0, ax ? 1 : 0, ay ? 1 : 0];   // 第二条切线
+
+          for (let k = 0; k < 4; k++) {
+            const v = F.v[k];
+            // 顶点局部坐标 → 判断它在这一面上的两个切向偏移
+            const o1 = (v[0] * t1[0] + v[1] * t1[1] + v[2] * t1[2]) * 2 - 1;
+            const o2 = (v[0] * t2[0] + v[1] * t2[1] + v[2] * t2[2]) * 2 - 1;
+            const sd = (d1, d2) => isOpaque(getEffective(nx + t1[0] * d1 + t2[0] * d2,
+                                                         ny + t1[1] * d1 + t2[1] * d2,
+                                                         nz + t1[2] * d1 + t2[2] * d2));
+            const s1 = sd(o1, 0), s2 = sd(0, o2), co = sd(o1, o2);
+            let a = vertexAO(s1 ? 1 : 0, s2 ? 1 : 0, co ? 1 : 0);
+            if (B.light) a = Math.max(a, 0.85);      // 萤石自发光
+
+            // 顶点位置加一点点世界偏移做纹理抖动，避免大色块的死板
+            const jitter = ((hash2(x * 4 + k, z * 4 + f, y) - 0.5) * 0.018);
+            pos.push(x + v[0] + F.n[0] * 0, y + v[1], z + v[2]);
+            col.push(base[0] * s / 255, base[1] * s / 255, base[2] * s / 255);
+            ao.push(a + jitter);
+          }
+        }
+      }
+
+  // 三角化：每个四边形 → 2 三角形（按 AO 对角线方向切，避免明暗撕裂）
+  const idx = [];
+  const quads = pos.length / 3 / 4;
+  for (let q = 0; q < quads; q++) {
+    const b = q * 4;
+    idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+  }
+  c.count = idx.length;
+  return { pos: new Float32Array(pos), col: new Float32Array(col), ao: new Float32Array(ao), idx: new Uint32Array(idx) };
+}
+
+/* ============================== WebGL 渲染 ============================== */
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl2', { antialias: true, alpha: false })
+        || canvas.getContext('webgl', { antialias: true, alpha: false });
+
+if (!gl) {
+  document.body.innerHTML = '<div style="color:#fff;font:16px sans-serif;padding:40px">' +
+    '你的浏览器/显卡不支持 WebGL，无法运行这个 3D 游戏 😢</div>';
+  throw new Error('no webgl');
+}
+const isGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+
+const VS = `
+attribute vec3 aPos;
+attribute vec3 aCol;
+attribute float aAO;
+uniform mat4 uProj, uView;
+uniform vec3 uCam;
+varying vec3 vCol;
+varying float vAO;
+varying float vDist;
+void main(){
+  vec4 wp = vec4(aPos, 1.0);
+  gl_Position = uProj * uView * wp;
+  vCol = aCol;
+  vAO = aAO;
+  vDist = length(aPos - uCam);
+}`;
+
+const FS = `
+precision mediump float;
+varying vec3 vCol;
+varying float vAO;
+varying float vDist;
+uniform vec3 uFog;
+uniform float uFogNear, uFogFar;
+uniform float uTorch;      // 准星指向时轻微提亮
+void main(){
+  float a = clamp(vAO, 0.30, 1.15);
+  vec3 c = vCol * a;
+  // 远处雾化（也顺手充当视距裁剪）
+  float f = clamp((vDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
+  c = mix(c, uFog, f * 0.92);
+  gl_FragColor = vec4(c, 1.0);
+}`;
+
+/* 线框 shader（选中方块高亮） */
+const LVS = `
+attribute vec3 aPos;
+uniform mat4 uProj, uView;
+void main(){ gl_Position = uProj * uView * vec4(aPos, 1.0); }`;
+const LFS = `
+precision mediump float;
+uniform vec4 uColor;
+void main(){ gl_FragColor = uColor; }`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw new Error('shader: ' + gl.getShaderInfoLog(s));
+  return s;
+}
+function program(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS))
+    throw new Error('link: ' + gl.getProgramInfoLog(p));
+  return p;
+}
+
+const progMain = program(VS, FS);
+const locMain = {
+  aPos: gl.getAttribLocation(progMain, 'aPos'),
+  aCol: gl.getAttribLocation(progMain, 'aCol'),
+  aAO:  gl.getAttribLocation(progMain, 'aAO'),
+  uProj: gl.getUniformLocation(progMain, 'uProj'),
+  uView: gl.getUniformLocation(progMain, 'uView'),
+  uCam: gl.getUniformLocation(progMain, 'uCam'),
+  uFog: gl.getUniformLocation(progMain, 'uFog'),
+  uFogNear: gl.getUniformLocation(progMain, 'uFogNear'),
+  uFogFar: gl.getUniformLocation(progMain, 'uFogFar'),
+  uTorch: gl.getUniformLocation(progMain, 'uTorch'),
+};
+const progLine = program(LVS, LFS);
+const locLine = {
+  aPos: gl.getAttribLocation(progLine, 'aPos'),
+  uProj: gl.getUniformLocation(progLine, 'uProj'),
+  uView: gl.getUniformLocation(progLine, 'uView'),
+  uColor: gl.getUniformLocation(progLine, 'uColor'),
+};
+
+/* 线框立方体（12 条边） */
+const lineBuf = gl.createBuffer();
+const LINE_VERTS = (() => {
+  const a = [];
+  const e = [[0,0,0,1,0,0],[1,0,0,1,0,1],[1,0,1,0,0,1],[0,0,1,0,0,0],
+             [0,1,0,1,1,0],[1,1,0,1,1,1],[1,1,1,0,1,1],[0,1,1,0,1,0],
+             [0,0,0,0,1,0],[1,0,0,1,1,0],[1,0,1,1,1,1],[0,0,1,0,1,1]];
+  for (const s of e) a.push(s[0],s[1],s[2], s[3],s[4],s[5]);
+  return new Float32Array(a);
+})();
+gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
+gl.bufferData(gl.ARRAY_BUFFER, LINE_VERTS, gl.STATIC_DRAW);
+
+/* 天空色（也是雾色） */
+const SKY = [0.44, 0.68, 0.92];
+
+/* 上传区块几何到 GPU */
+const STRIDE = 7;  // x,y,z, r,g,b, ao
+function uploadChunk(c, data) {
+  if (!c.vbo) {
+    c.vbo = gl.createBuffer();
+    c.ibo = gl.createBuffer();
+    c.vao = isGL2 ? gl.createVertexArray() : null;
+  }
+  const inter = new Float32Array(data.pos.length / 3 * STRIDE);
+  for (let i = 0, o = 0; i < data.pos.length / 3; i++) {
+    inter[o++] = data.pos[i * 3]; inter[o++] = data.pos[i * 3 + 1]; inter[o++] = data.pos[i * 3 + 2];
+    inter[o++] = data.col[i * 3]; inter[o++] = data.col[i * 3 + 1]; inter[o++] = data.col[i * 3 + 2];
+    inter[o++] = data.ao[i];
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, c.vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, inter, gl.DYNAMIC_DRAW);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.ibo);
+  const iboData = isGL2 ? data.idx : new Uint16Array(data.idx);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, iboData, gl.DYNAMIC_DRAW);
+  c.count = data.idx.length;
+  c.dirty = false;
+  c.built = true;
+}
+
+function drawChunk(c, uProj, uView, cam) {
+  if (!c.count || !c.vbo) return;
+  gl.bindBuffer(gl.ARRAY_BUFFER, c.vbo);
+  const bs = STRIDE * 4;
+  gl.enableVertexAttribArray(locMain.aPos);
+  gl.vertexAttribPointer(locMain.aPos, 3, gl.FLOAT, false, bs, 0);
+  gl.enableVertexAttribArray(locMain.aCol);
+  gl.vertexAttribPointer(locMain.aCol, 3, gl.FLOAT, false, bs, 12);
+  gl.enableVertexAttribArray(locMain.aAO);
+  gl.vertexAttribPointer(locMain.aAO, 1, gl.FLOAT, false, bs, 24);
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.ibo);
+  gl.drawElements(gl.TRIANGLES, c.count, isGL2 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0);
+}
+
+/* ============================== 玩家 ============================== */
+const player = {
+  x: 0, y: 30, z: 0,
+  vx: 0, vy: 0, vz: 0,
+  yaw: 0, pitch: 0,
+  fly: false,
+  onGround: false,
+  inWater: false,
+  spawn: [0, 30, 0],
+};
+
+/* 沿单轴移动并解决与方块的碰撞（AABB 扫掠的简化逐轴解法） */
+function moveAxis(axis, amount) {
+  if (amount === 0) return;
+  const p = player;
+  const before = { x: p.x, y: p.y, z: p.z };
+  p[axis] += amount;
+
+  const minX = p.x - PW, maxX = p.x + PW;
+  const minY = p.y, maxY = p.y + 1.8;
+  const minZ = p.z - PW, maxZ = p.z + PW;
+
+  const x0 = Math.floor(minX), x1 = Math.floor(maxX - 1e-6);
+  const y0 = Math.floor(minY), y1 = Math.floor(maxY - 1e-6);
+  const z0 = Math.floor(minZ), z1 = Math.floor(maxZ - 1e-6);
+
+  for (let y = y0; y <= y1; y++)
+    for (let z = z0; z <= z1; z++)
+      for (let x = x0; x <= x1; x++) {
+        if (!isSolid(getEffective(x, y, z))) continue;
+        // 与该方块碰撞 → 回退到贴合位置
+        if (amount > 0) p[axis] = (axis === 'x' ? x : axis === 'y' ? y : z) - (axis === 'y' ? 1.8 : PW) - 1e-4;
+        else            p[axis] = (axis === 'x' ? x + 1 : axis === 'y' ? y + 1 : z + 1) + ((axis === 'y') ? 0 : PW) + 1e-4;
+        if (axis === 'y') { if (amount < 0) p.onGround = true; p.vy = 0; }
+        else p['v' + axis] = 0;
+        return;
+      }
+}
+
+function updatePhysics(dt, input) {
+  const p = player;
+  p.inWater = getEffective(Math.floor(p.x), Math.floor(p.y + 0.9), Math.floor(p.z)) === 11;
+
+  // 目标速度
+  const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
+  let wishX = 0, wishZ = 0;
+  if (input.f) { wishX -= sy; wishZ -= cy; }
+  if (input.b) { wishX += sy; wishZ += cy; }
+  if (input.l) { wishX -= cy; wishZ += sy; }
+  if (input.r) { wishX += cy; wishZ -= sy; }
+  const len = Math.hypot(wishX, wishZ);
+  if (len > 0) { wishX /= len; wishZ /= len; }
+
+  const sprint = input.shift && !p.fly ? 1.45 : 1;
+  let speed = (p.fly ? 13 : p.inWater ? 3.4 : 4.9) * sprint;
+  if (input.sprint) speed *= 1.25;
+
+  if (p.fly) {
+    const accel = 14;
+    p.vx += (wishX * speed - p.vx) * Math.min(1, accel * dt);
+    p.vz += (wishZ * speed - p.vz) * Math.min(1, accel * dt);
+    let vy = 0;
+    if (input.jump) vy += speed * 0.85;
+    if (input.shift) vy -= speed * 0.85;
+    p.vy += (vy - p.vy) * Math.min(1, accel * dt);
+  } else {
+    const accel = p.onGround ? 22 : 7;
+    p.vx += (wishX * speed - p.vx) * Math.min(1, accel * dt);
+    p.vz += (wishZ * speed - p.vz) * Math.min(1, accel * dt);
+    const g = p.inWater ? 6 : G;
+    p.vy -= g * dt;
+    if (p.inWater) { p.vy = Math.max(p.vy, -3.2); p.vx *= 0.94; p.vz *= 0.94; }
+    if (input.jump && (p.onGround || p.inWater)) { p.vy = p.inWater ? 4.2 : JUMP_V; p.onGround = false; }
+  }
+
+  p.onGround = false;
+  moveAxis('x', p.vx * dt);
+  moveAxis('z', p.vz * dt);
+  moveAxis('y', p.vy * dt);
+
+  // 无横向边界：地形向外平铺，走多远都不会撞墙
+  if (p.y < 1) { p.vy = 0; p.y = Math.max(2, p.y); }
+  // 掉出世界底部（挖穿了基岩）才回出生点
+  if (p.y < -6) {
+    p.x = p.spawn[0]; p.y = p.spawn[1]; p.z = p.spawn[2];
+    p.vx = p.vy = p.vz = 0;
+  }
+}
+
+/* --------------------------- DDA 体素射线拾取 --------------------------- */
+function raycast(maxDist) {
+  const p = player;
+  const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
+  const cp = Math.cos(p.pitch), sp = Math.sin(p.pitch);
+  const dx = -sy * cp, dy = sp, dz = -cy * cp;
+  const ox = p.x, oy = p.y + EYE, oz = p.z;
+
+  let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
+  const stepX = dx > 0 ? 1 : -1, stepY = dy > 0 ? 1 : -1, stepZ = dz > 0 ? 1 : -1;
+  const tDeltaX = dx !== 0 ? Math.abs(1 / dx) : Infinity;
+  const tDeltaY = dy !== 0 ? Math.abs(1 / dy) : Infinity;
+  const tDeltaZ = dz !== 0 ? Math.abs(1 / dz) : Infinity;
+  let tMaxX = dx !== 0 ? ((dx > 0 ? x + 1 - ox : ox - x) * tDeltaX) : Infinity;
+  let tMaxY = dy !== 0 ? ((dy > 0 ? y + 1 - oy : oy - y) * tDeltaY) : Infinity;
+  let tMaxZ = dz !== 0 ? ((dz > 0 ? z + 1 - oz : oz - z) * tDeltaZ) : Infinity;
+
+  let nx = 0, ny = 0, nz = 0, t = 0;
+  for (let i = 0; i < 200; i++) {
+    if (t > maxDist) return null;
+    const id = getEffective(x, y, z);
+    // 站在方块上往下看时，脚下那块要能挖；但同层的方块不能挖（否则会挖进自己身体）
+    if (id && id !== 11 && !insideSelf(x, y, z)) return { x, y, z, nx, ny, nz, id, dist: t };
+    if (tMaxX < tMaxY && tMaxX < tMaxZ) { x += stepX; t = tMaxX; tMaxX += tDeltaX; nx = -stepX; ny = 0; nz = 0; }
+    else if (tMaxY < tMaxZ) { y += stepY; t = tMaxY; tMaxY += tDeltaY; nx = 0; ny = -stepY; nz = 0; }
+    else { z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; nx = 0; ny = 0; nz = -stepZ; }
+  }
+  return null;
+}
+
+/* 判断某方块是否与玩家身体重叠。
+ * 只排除「身体所在的那一层」——即方块顶面高于脚底且底面低于头顶。
+ * 脚下（y = floor(p.y) - 1）的方块不满足该条件，因此可以被正常挖掘。 */
+function insideSelf(x, y, z) {
+  const p = player;
+  const bodyY = Math.floor(p.y);
+  if (y !== bodyY) return false;
+  return x + 1 > p.x - PW && x < p.x + PW && z + 1 > p.z - PW && z < p.z + PW;
+}
+
+/* ============================== 音效 ============================== */
+/* 纯 WebAudio 合成，不加载任何音频文件 */
+let actx = null;
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = false; } }
+  if (actx && actx.state === 'suspended') actx.resume();
+  return actx || null;
+}
+function blip(freq, dur, type = 'square', vol = 0.055) {
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, a.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(); o.stop(a.currentTime + dur);
+}
+function noiseBurst(dur = 0.09, vol = 0.10, lp = 1400) {
+  const a = audio(); if (!a) return;
+  const n = Math.floor(a.sampleRate * dur);
+  const buf = a.createBuffer(1, n, a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.2);
+  const s = a.createBufferSource(); s.buffer = buf;
+  const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp;
+  const g = a.createGain(); g.gain.value = vol;
+  s.connect(f); f.connect(g); g.connect(a.destination);
+  s.start();
+}
+
+/* ============================== 输入 ============================== */
+const input = { f: false, b: false, l: false, r: false, jump: false, shift: false, sprint: false };
+const keys = {};
+let running = false;       // 是否处于游戏中（鼠标已锁定）
+let paused = false;
+let selected = 0;          // 当前物品栏索引
+let lastAction = 0;        // 连续挖掘/放置的节流
+let breakHeld = false, placeHeld = false;
+
+window.addEventListener('keydown', (e) => {
+  const k = e.code;
+  if (keys[k]) return;
+  keys[k] = true;
+  if (k === 'KeyW') input.f = true;
+  if (k === 'KeyS') input.b = true;
+  if (k === 'KeyA') input.l = true;
+  if (k === 'KeyD') input.r = true;
+  if (k === 'Space') { input.jump = true; e.preventDefault(); }
+  if (k === 'ShiftLeft' || k === 'ShiftRight') input.shift = true;
+  if (k === 'ControlLeft') input.sprint = true;
+
+  if (k === 'KeyF') {
+    player.fly = !player.fly;
+    player.vy = 0;
+    document.getElementById('flyTag').textContent = player.fly ? '(开)' : '(关)';
+    blip(player.fly ? 880 : 440, 0.09, 'sine', 0.06);
+  }
+  if (k === 'KeyR') { player.x = player.spawn[0]; player.y = player.spawn[1]; player.z = player.spawn[2]; player.vx = player.vy = player.vz = 0; blip(660, .12, 'sine', .06); }
+  if (k >= 'Digit1' && k <= 'Digit9') selectSlot(+k.slice(5) - 1);
+  if (k === 'Escape') { /* 由 pointerlockchange 处理 */ }
+});
+window.addEventListener('keyup', (e) => {
+  const k = e.code;
+  keys[k] = false;
+  if (k === 'KeyW') input.f = false;
+  if (k === 'KeyS') input.b = false;
+  if (k === 'KeyA') input.l = false;
+  if (k === 'KeyD') input.r = false;
+  if (k === 'Space') input.jump = false;
+  if (k === 'ShiftLeft' || k === 'ShiftRight') input.shift = false;
+  if (k === 'ControlLeft') input.sprint = false;
+});
+
+/* --------------------------- 鼠标 / 触摸视角 --------------------------- */
+const SENS = 0.0022;
+function addLook(dx, dy) {
+  player.yaw -= dx * SENS;
+  player.pitch = clamp(player.pitch - dy * SENS, -Math.PI / 2 + 0.02, Math.PI / 2 - 0.02);
+}
+
+document.addEventListener('mousemove', (e) => {
+  if (document.pointerLockElement === canvas) addLook(e.movementX || 0, e.movementY || 0);
+});
+
+/* 拖拽转头：指针锁定后也能用（右键拖拽），未锁定时左键拖拽即可。
+ * 这样即使鼠标没锁上、或锁定后想微调视角，都有办法转头。 */
+let dragging = false, lastMX = 0, lastMY = 0, dragPointerId = null;
+function startDrag(e) {
+  if (!running) return;
+  dragging = true; dragPointerId = e.pointerId ?? null;
+  lastMX = e.clientX; lastMY = e.clientY;
+}
+function endDrag() { dragging = false; dragPointerId = null; }
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (!running) return;
+  const locked = document.pointerLockElement === canvas;
+  // 未锁定：左键/触摸都能拖；已锁定：用右键拖（左键留给挖掘）
+  if (!locked) { startDrag(e); return; }
+  if (e.button === 2) startDrag(e);
+});
+window.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  if (dragPointerId !== null && e.pointerId !== dragPointerId) return;
+  addLook(e.clientX - lastMX, e.clientY - lastMY);
+  lastMX = e.clientX; lastMY = e.clientY;
+});
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointercancel', endDrag);
+window.addEventListener('blur', endDrag);
+/* 锁定状态下右键拖拽：屏蔽浏览器右键菜单，并吞掉这次右键的放置动作 */
+let suppressPlace = false;
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (document.pointerLockElement === canvas && dragPointerId !== null) suppressPlace = true;
+});
+
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  selectSlot((selected + (e.deltaY > 0 ? 1 : -1) + HOTBAR.length) % HOTBAR.length);
+}, { passive: false });
+
+/* 鼠标按键：左挖右放，长按连续动作 */
+canvas.addEventListener('mousedown', (e) => {
+  if (!running) return;
+  if (e.button === 0) { breakHeld = true; doBreak(); }
+  if (e.button === 2) { placeHeld = true; doPlace(); }
+});
+window.addEventListener('mouseup', (e) => {
+  if (e.button === 0) breakHeld = false;
+  if (e.button === 2) placeHeld = false;
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* --------------------------- 触屏双摇杆 --------------------------- */
+let stickVec = { x: 0, y: 0 }, lookVec = { x: 0, y: 0 };
+function bindStick(el, onMove, onEnd) {
+  const knob = el.querySelector('.knob');
+  let id = null, cx = 0, cy = 0;
+  const R = () => el.clientWidth * 0.36;
+  el.addEventListener('touchstart', (e) => {
+    const t = e.changedTouches[0]; id = t.identifier;
+    const r = el.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+    e.preventDefault();
+  }, { passive: false });
+  el.addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== id) continue;
+      const r = R();
+      let dx = t.clientX - cx, dy = t.clientY - cy;
+      const d = Math.hypot(dx, dy);
+      if (d > r) { dx = dx / d * r; dy = dy / d * r; }
+      knob.style.transform = `translate(${dx}px,${dy}px)`;
+      onMove(dx / r, dy / r);
+      e.preventDefault();
+    }
+  }, { passive: false });
+  const end = (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier !== id) continue;
+      id = null; knob.style.transform = ''; onEnd();
+    }
+  };
+  el.addEventListener('touchend', end);
+  el.addEventListener('touchcancel', end);
+}
+if ('ontouchstart' in window && matchMedia('(pointer:coarse)').matches) {
+  document.body.classList.add('touch');
+  const st = document.getElementById('stick'), lk = document.getElementById('joy2');
+  bindStick(st, (x, y) => { stickVec = { x, y }; }, () => { stickVec = { x: 0, y: 0 }; });
+  bindStick(lk, (x, y) => { lookVec = { x, y }; }, () => { lookVec = { x: 0, y: 0 }; });
+  document.getElementById('btnJump').addEventListener('touchstart', (e) => { input.jump = true; e.preventDefault(); }, { passive: false });
+  document.getElementById('btnJump').addEventListener('touchend', () => { input.jump = false; });
+  document.getElementById('btnUp').addEventListener('touchstart', (e) => { input.jump = true; e.preventDefault(); }, { passive: false });
+  document.getElementById('btnUp').addEventListener('touchend', () => { input.jump = false; });
+  document.getElementById('btnDown').addEventListener('touchstart', (e) => { input.shift = true; e.preventDefault(); }, { passive: false });
+  document.getElementById('btnDown').addEventListener('touchend', () => { input.shift = false; });
+  document.getElementById('btnFly').addEventListener('click', () => {
+    player.fly = !player.fly; player.vy = 0;
+    document.getElementById('flyTag').textContent = player.fly ? '(开)' : '(关)';
+  });
+  // 触屏：轻点屏幕 = 挖掘，长按 = 放置
+  let tapT = 0, tapTimer = null;
+  canvas.addEventListener('touchstart', (e) => {
+    tapT = performance.now();
+    tapTimer = setTimeout(() => { placeHeld = true; doPlace(); }, 380);
+  }, { passive: true });
+  canvas.addEventListener('touchend', () => {
+    clearTimeout(tapTimer);
+    if (performance.now() - tapT < 380) { doBreak(); }
+    breakHeld = false; placeHeld = false;
+  });
+}
+
+/* ============================== 操作 ============================== */
+let targetBlock = null;     // 当前指向的方块（用于渲染高亮）
+
+function doBreak() {
+  if (!running) return;
+  const hit = raycast(REACH);
+  if (!hit) return;
+  if (hit.id === 13 && hit.y === 0) { blip(160, .1, 'sawtooth', .05); return; }  // 基岩不可破坏
+  const id = hit.id;
+  setBlock(hit.x, hit.y, hit.z, 0);
+  noiseBurst(0.10, 0.09, id === 5 ? 2600 : id === 10 ? 5200 : 1100);
+  blip(120 + id * 14, 0.05, 'triangle', 0.035);
+  // 掉落的碎石粒子
+  spawnParticles(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, BLOCKS[id].side);
+}
+
+function doPlace() {
+  if (!running) return;
+  const hit = raycast(REACH);
+  if (!hit) return;
+  const x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
+  if (y < 0 || y >= H) return;                  // 只限制垂直范围，水平方向无限
+  if (getEffective(x, y, z) !== 0 && getEffective(x, y, z) !== 11) return;
+  // 不能把方块塞进自己身体里
+  const id = HOTBAR[selected];
+  if (isSolid(id) && insideSelf(x, y, z)) return;
+  setBlock(x, y, z, id);
+  noiseBurst(0.06, 0.07, 900);
+  blip(300 + id * 10, 0.05, 'sine', 0.04);
+}
+
+/* 简易粒子（CPU 端小立方体，用线框程序画点） */
+const particles = [];
+function spawnParticles(x, y, z, col) {
+  for (let i = 0; i < 8; i++) {
+    particles.push({
+      x, y, z,
+      vx: (Math.random() - .5) * 3, vy: Math.random() * 3.4 + 1, vz: (Math.random() - .5) * 3,
+      life: 0.7 + Math.random() * 0.4, col,
+    });
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.vy -= 18 * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+    if (isSolid(getEffective(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)))) {
+      p.vy = Math.abs(p.vy) * 0.28; p.vx *= .5; p.vz *= .5;
+      p.y = Math.floor(p.y) + 0.02;
+    }
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+/* 物品栏 UI */
+function buildHotbar() {
+  const bar = document.getElementById('hotbar');
+  bar.innerHTML = '';
+  HOTBAR.forEach((id, i) => {
+    const B = BLOCKS[id];
+    const el = document.createElement('div');
+    el.className = 'slot' + (i === selected ? ' on' : '');
+    el.title = B.name;
+    const c = `rgb(${B.side[0]},${B.side[1]},${B.side[2]})`;
+    el.innerHTML = `<span class="key">${i + 1}</span>
+      <span class="sw" style="background:${c}"></span>
+      <span class="nm">${B.n}</span>`;
+    el.addEventListener('click', () => selectSlot(i));
+    bar.appendChild(el);
+  });
+}
+function selectSlot(i) {
+  selected = clamp(i, 0, HOTBAR.length - 1);
+  [...document.querySelectorAll('.slot')].forEach((el, k) => el.classList.toggle('on', k === selected));
+  blip(520 + selected * 40, 0.04, 'sine', 0.03);
+}
+
+/* ============================== 主循环 ============================== */
+let last = 0, fps = 0, fpsAcc = 0, fpsN = 0, frames = 0;
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.floor(innerWidth * dpr), h = Math.floor(innerHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+  }
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener('resize', resize);
+
+/* 视锥剔除：用相机平面把区块 AABB 快速筛掉 */
+function chunkVisible(c, planes) {
+  for (const p of planes) {
+    // 取 AABB 在法线方向上最靠近相机的那个角
+    const px = p[0] > 0 ? c.max[0] : c.min[0];
+    const py = p[1] > 0 ? c.max[1] : c.min[1];
+    const pz = p[2] > 0 ? c.max[2] : c.min[2];
+    if (p[0] * px + p[1] * py + p[2] * pz + p[3] < 0) return false;
+  }
+  return true;
+}
+/* 从 viewProj 矩阵提取 6 个裁剪平面 */
+function extractPlanes(m) {
+  const rows = [
+    [m[0], m[4], m[8], m[12]],
+    [m[1], m[5], m[9], m[13]],
+    [m[2], m[6], m[10], m[14]],
+    [m[3], m[7], m[11], m[15]],
+  ];
+  const P = [];
+  const add = (a, b, s) => {
+    const p = [a[0] + s * b[0], a[1] + s * b[1], a[2] + s * b[2], a[3] + s * b[3]];
+    const n = Math.hypot(p[0], p[1], p[2]) || 1;
+    P.push([p[0] / n, p[1] / n, p[2] / n, p[3] / n]);
+  };
+  add(rows[3], rows[0], 1); add(rows[3], rows[0], -1);
+  add(rows[3], rows[1], 1); add(rows[3], rows[1], -1);
+  add(rows[3], rows[2], 1); add(rows[3], rows[2], -1);
+  return P;
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const t = now / 1000;
+  let dt = last ? t - last : 0;
+  last = t;
+  if (dt > 0.1) dt = 0.1;
+  frames++;
+
+  resize();
+
+  // 触屏摇杆 → 输入
+  if (stickVec.x || stickVec.y) {
+    const dead = 0.22;
+    input.f = stickVec.y < -dead; input.b = stickVec.y > dead;
+    input.l = stickVec.x < -dead; input.r = stickVec.x > dead;
+  }
+  if (lookVec.x || lookVec.y) addLook(lookVec.x * 11, lookVec.y * 11);
+
+  if (running && !paused) {
+    updatePhysics(dt, input);
+    updateParticles(dt);
+    // 长按连续挖掘 / 放置（每 0.18s 一次）
+    if (breakHeld && t - lastAction > 0.18) { doBreak(); lastAction = t; }
+    if (placeHeld && t - lastAction > 0.22) { doPlace(); lastAction = t; }
+  }
+  targetBlock = running ? raycast(REACH) : null;
+
+  // ---------------- 渲染 ----------------
+  const aspect = canvas.width / Math.max(1, canvas.height);
+  const proj = M4.persp(Math.PI / 180 * 72, aspect, 0.08, 240);
+  const cam = M4.view(player.x, player.y + EYE, player.z, player.yaw, player.pitch);
+  const vp = M4.mul(proj, cam.view);
+  const planes = extractPlanes(vp);
+
+  gl.clearColor(SKY[0], SKY[1], SKY[2], 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE);
+  gl.cullFace(gl.BACK);
+
+  // 0) 玩家走近窗口边缘时，把区块窗口整体平移一格（无限地形的关键）
+  const pgx = Math.floor(player.x / CW), pgz = Math.floor(player.z / CD);
+  const offX = pgx - anchorGX, offZ = pgz - anchorGZ;
+  const halfX = VIEW_CX >> 1, halfZ = VIEW_CZ >> 1;
+  if (Math.abs(offX - halfX) > 1 || Math.abs(offZ - halfZ) > 1) {
+    // 每次只挪一格，避免跨越太多导致一次性重建大量区块
+    const dgx = clamp(offX - halfX, -1, 1);
+    const dgz = clamp(offZ - halfZ, -1, 1);
+    if (dgx || dgz) shiftChunks(dgx, dgz);
+  }
+
+  // 1) 构建脏区块（每帧限制数量，避免卡顿）
+  let budget = 4;
+  for (const c of chunks) {
+    if (c.dirty && budget > 0) { uploadChunk(c, buildChunk(c)); budget--; }
+  }
+
+  // 2) 方块
+  gl.useProgram(progMain);
+  gl.uniformMatrix4fv(locMain.uProj, false, proj);
+  gl.uniformMatrix4fv(locMain.uView, false, cam.view);
+  gl.uniform3f(locMain.uCam, player.x, player.y + EYE, player.z);
+  gl.uniform3f(locMain.uFog, SKY[0], SKY[1], SKY[2]);
+  gl.uniform1f(locMain.uFogNear, 34);
+  gl.uniform1f(locMain.uFogFar, 96);
+  gl.uniform1f(locMain.uTorch, 0);
+
+  let drawn = 0, tris = 0;
+  for (const c of chunks) {
+    if (!c.built || !c.count) continue;
+    if (!chunkVisible(c, planes)) continue;
+    drawChunk(c, proj, cam.view);
+    drawn++; tris += c.count / 3;
+  }
+
+  // 3) 选中方块高亮 + 粒子
+  gl.useProgram(progLine);
+  gl.uniformMatrix4fv(locLine.uProj, false, proj);
+  gl.uniformMatrix4fv(locLine.uView, false, cam.view);
+  gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
+  gl.enableVertexAttribArray(locLine.aPos);
+  gl.vertexAttribPointer(locLine.aPos, 3, gl.FLOAT, false, 0, 0);
+  gl.disable(gl.CULL_FACE);
+
+  if (targetBlock) {
+    const t = targetBlock;
+    // 先在稍大的尺寸画一圈暗色描边，再画白框，让高亮在任何背景上都清晰
+    gl.uniform4f(locLine.uColor, 0.03, 0.03, 0.04, 0.75);
+    drawLineBox(t.x + 0.5, t.y + 0.5, t.z + 0.5, 1.008);
+    gl.uniform4f(locLine.uColor, 1, 1, 1, 0.9);
+    drawLineBox(t.x + 0.5, t.y + 0.5, t.z + 0.5, 1.0);
+  }
+
+  // 粒子：用小立方体线框表示
+  if (particles.length) {
+    for (const p of particles) {
+      gl.uniform4f(locLine.uColor, p.col[0] / 255, p.col[1] / 255, p.col[2] / 255, 1);
+      drawLineBox(p.x, p.y, p.z, 0.09);
+    }
+  }
+  gl.enable(gl.CULL_FACE);
+
+  // 4) 准星命中反馈 + HUD
+  const cross = document.getElementById('cross');
+  cross.classList.toggle('hit', !!targetBlock);
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc > 0.5) { fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
+  if (frames % 12 === 0) {
+    document.getElementById('stat').textContent =
+      `${fps} FPS · 区块 ${drawn}/${chunks.length} · 三角面 ${(tris / 1000).toFixed(1)}k · ` +
+      `坐标 ${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}` +
+      (player.inWater ? ' · 水中' : '') + (player.fly ? ' · 飞行' : '');
+  }
+}
+
+/* 画一个线框立方体：用 model 矩阵方式在 CPU 端变换太慢，
+ * 改用 uniform 传偏移，把 12 条边的顶点按偏移平移绘制 */
+let lineLoc = null;
+function drawLineBox(cx, cy, cz, size) {
+  // 直接在 JS 里生成这个盒子的 24 个顶点（12 条边）—— 数量极少，开销可忽略
+  const h = size / 2;
+  const v = [];
+  const P = [
+    [-h,-h,-h],[ h,-h,-h],[ h,-h, h],[-h,-h, h],
+    [-h, h,-h],[ h, h,-h],[ h, h, h],[-h, h, h],
+  ];
+  const E = [[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  for (const [a, b] of E) {
+    v.push(cx + P[a][0], cy + P[a][1], cz + P[a][2]);
+    v.push(cx + P[b][0], cy + P[b][1], cz + P[b][2]);
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER, lineBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(v), gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(locLine.aPos);
+  gl.vertexAttribPointer(locLine.aPos, 3, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.LINES, 0, v.length / 3);
+}
+
+/* ============================== 启动流程 ============================== */
+function startGame(wantLock = true) {
+  audio();
+  running = true;
+  paused = false;
+  document.getElementById('veil').classList.add('hide');
+  if (wantLock && canvas.requestPointerLock) canvas.requestPointerLock();
+}
+function pauseGame() {
+  running = false;
+  paused = true;
+  Object.keys(input).forEach((k) => (input[k] = false));
+  breakHeld = placeHeld = false;
+  document.getElementById('veil').classList.remove('hide');
+  document.getElementById('veilHint').innerHTML =
+    '已暂停 — 点击继续，或按 <b>Esc</b> 关闭鼠标锁定';
+}
+document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement === canvas) {
+    document.getElementById('veil').classList.add('hide');
+    running = true; paused = false;
+  } else if (running) {
+    pauseGame();
+  }
+});
+document.getElementById('btnStart').addEventListener('click', () => startGame(true));
+document.getElementById('veil').addEventListener('click', (e) => {
+  if (e.target.id === 'veil' || e.target.classList.contains('panel') || e.target.id === 'veilHint') {
+    // 触屏设备没有指针锁定，直接进游戏
+    if (document.body.classList.contains('touch')) startGame(false);
+    else canvas.requestPointerLock ? startGame(true) : startGame(false);
+  }
+});
+
+/* ------------------------------ 初始化世界 ------------------------------ */
+(function boot() {
+  const t0 = performance.now();
+  const info = generate(20260918);
+  player.spawn = findSpawn();
+  player.x = player.spawn[0];
+  player.y = player.spawn[1];
+  player.z = player.spawn[2];
+  // 面朝地图中心
+  player.yaw = Math.atan2(W / 2 - player.x, D / 2 - player.z) + Math.PI;
+
+  // 区块窗口以玩家所在区块为中心，之后随玩家移动自动平移
+  initChunks(Math.floor(player.x / CW), Math.floor(player.z / CD));
+  buildHotbar();
+  resize();
+
+  // 逐帧预构建全部区块，构建期间显示进度
+  let done = 0;
+  const total = chunks.length;
+  const veil = document.getElementById('veilHint');
+  function step() {
+    const budgetStart = performance.now();
+    while (done < total && performance.now() - budgetStart < 14) {
+      uploadChunk(chunks[done], buildChunk(chunks[done]));
+      done++;
+    }
+    if (done < total) {
+      veil.textContent = `正在生成地形… ${Math.round(done / total * 100)}%`;
+      requestAnimationFrame(step);
+    } else {
+      veil.innerHTML = `地形就绪（${info.trees} 棵树）· 点击后会锁定鼠标，按 <b>Esc</b> 可随时退出`;
+      document.getElementById('btnStart').textContent = '开始游戏';
+    }
+  }
+  step();
+  console.log(`[voxel] 世界生成耗时 ${(performance.now() - t0).toFixed(0)}ms, 区块 ${total}`);
+})();
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
