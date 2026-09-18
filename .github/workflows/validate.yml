@@ -1,0 +1,97 @@
+name: Validate
+
+# 别人提 PR 时自动校验，并把结果留言到 PR 上。
+# 只有「维护者点了合并」才会真正上线 —— 这个工作流不会改仓库、不会部署。
+# 校验范围：全仓库的 .html（含根目录 index.html 与 games/ 下的所有页面）。
+on:
+  pull_request:
+    paths:
+      - 'games/**'
+      - 'index.html'
+      - 'scan.js'
+      - '.github/workflows/validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: validate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: 校验提交的页面
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 跑 scan.js --check
+        id: check
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          node scan.js --check 2>&1 | tee /tmp/result.txt
+
+      - name: 留言到 PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+        with:
+          script: |
+            const fs = require('fs');
+            let out = '';
+            try { out = fs.readFileSync('/tmp/result.txt', 'utf8').trim(); } catch (e) { out = '(没有输出)'; }
+            const ok = process.env.CHECK_OUTCOME === 'success';
+
+            const header = ok
+              ? '### ✅ 校验通过\n\n你的页面没问题，等维护者合并后就会自动上线。'
+              : '### ❌ 校验没通过\n\n按下面提示改一下，再 push 到同一个分支即可（不用重开 PR）：';
+
+            const hints = ok ? '' : [
+              '',
+              '---',
+              '**常见问题速查**',
+              '- 单文件零依赖：样式/脚本要内联，别引用同目录的外部 `.js` / `.css`；图片音频请用 CDN 绝对地址或 data URI',
+              '- 必须有 `<meta charset="UTF-8">` 和 `<meta name="viewport" ...>`',
+              '- `<title>` 写个有意义的名字，别等于文件名',
+              '- 单页不要超过 2MB',
+              '',
+              '想自定义分类 / 图标 / 署名，在 `<head>` 里加：',
+              '```html',
+              '<meta name="description" content="一句话介绍">',
+              '<meta name="wb-category" content="游戏">',
+              '<meta name="wb-icon"     content="🎮">',
+              '<meta name="wb-tags"     content="休闲,键盘">',
+              '<meta name="wb-author"   content="你的GitHub用户名">',
+              '<meta name="wb-order"    content="10">',
+              '```'
+            ].join('\n');
+
+            const body = `${header}\n\n\`\`\`\n${out}\n\`\`\`\n${hints}\n\n<!-- games-validate -->`;
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+
+            // 同一个 PR 只保留一条机器人留言，避免刷屏
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const mine = comments.find(c => c.body && c.body.includes('<!-- games-validate -->'));
+            if (mine) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: 校验失败则让检查标红
+        if: steps.check.outcome != 'success'
+        run: |
+          echo "::error::页面校验未通过，详情见 PR 留言。"
+          exit 1

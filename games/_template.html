@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>我的小游戏</title>
+
+<!-- ================= 导航站约定标签（照着改，全部可选） =================
+     只有 <title> 是必填的；其余不写也能被收录，但分类和卡片会不够好看。
+     写好后把本文件复制成你想叫的名字，例如 games/my-game.html，再提 PR。 -->
+
+<!-- 卡片上显示的一句话介绍，尽量 30 字内，会显示两行 -->
+<meta name="description" content="用一句话说清玩法，比如：方向键控制小球吃满全屏的豆子。">
+
+<!-- 分类：不写就按所在目录名 / 关键词自动判断。分类名随意取，会出现在导航页的分组标题上 -->
+<meta name="wb-category" content="游戏">
+
+<!-- 卡片封面上的 emoji -->
+<meta name="wb-icon" content="🎮">
+
+<!-- 搜索用的标签，逗号分隔 -->
+<meta name="wb-tags" content="休闲,键盘,触屏">
+
+<!-- 你的 GitHub 用户名（会显示在卡片上，让人知道是谁做的） -->
+<meta name="wb-author" content="">
+
+<!-- 同分类内的排序权重，越小越靠前；不写按修改时间排 -->
+<meta name="wb-order" content="100">
+<!-- ==================================================================== -->
+
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;display:grid;place-items:center;
+    background:#0b0e14;color:#e8eef8;
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    user-select:none;-webkit-tap-highlight-color:transparent;
+  }
+  .box{text-align:center;padding:28px}
+  h1{margin:0 0 6px;font-size:22px;letter-spacing:.5px}
+  p{margin:0 0 18px;color:#8b98ad;font-size:13px}
+  button{
+    font:inherit;font-size:14px;padding:11px 26px;border-radius:12px;cursor:pointer;color:#04121a;
+    border:0;background:linear-gradient(135deg,#43e0ff,#a855f7);font-weight:600;
+  }
+  button:hover{transform:translateY(-1px)}
+  #out{margin-top:18px;font-size:15px;color:#43e0ff;min-height:22px}
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>🎮 我的小游戏</h1>
+    <p>把这个文件改成你自己的游戏。<br>单文件、零依赖 —— 样式和脚本都内联在这个 html 里。</p>
+    <button id="btn">点我</button>
+    <div id="out"></div>
+  </div>
+
+<script>
+/* 你的游戏逻辑写在这里。
+   注意：
+   - 不要引用同目录的外部 .js / .css（提交时会校验并报错）
+   - 图片/音频请用 CDN 绝对地址或内联 data URI
+   - 手机上要能玩，宽度自适应
+   - 键盘 + 触屏都支持会更受欢迎 */
+
+var n = 0;
+var btn = document.getElementById('btn');
+var out = document.getElementById('out');
+btn.addEventListener('click', function () {
+  n += 1;
+  out.textContent = '你点了 ' + n + ' 次';
+});
+</script>
+</body>
+</html>

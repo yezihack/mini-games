@@ -1,0 +1,75 @@
+name: Build & Deploy
+
+# 合并进 main 之后：重新扫描生成清单 → 把清单提交回仓库 → 部署到 GitHub Pages。
+# 也是唯一会改动 files-data.js 的地方 —— 贡献者永远不需要手动更新清单。
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'games/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write     # 需要它才能把 files-data.js 提交回仓库
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: 扫描并提交清单
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 重新生成清单
+        run: node scan.js
+
+      - name: 把清单提交回仓库
+        id: commit
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add files-data.js
+          if git diff --cached --quiet; then
+            echo "清单无变化，跳过提交"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: 自动更新游戏清单 [skip ci]"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 打包站点
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # 发布整个仓库根目录 —— 根 index.html 就是站点首页，games/ 原样出现在 /仓库名/games/
+          path: .
+
+  deploy:
+    name: 部署到 GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
