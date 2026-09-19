@@ -1,8 +1,8 @@
 // ⚠ 本文件由 scan.js 自动生成，请勿手动编辑（改了也会被下次扫描覆盖）。
-// 生成时间：2026-09-18T13:42:47.236Z
+// 生成时间：2026-09-19T11:47:15.624Z
 // 想让某个人页面自定义分类/图标/简介，请改那个 html 的 <head> 里的 wb-* 标签。
 window.__GAMES_INDEX__ = {
-  "generatedAt": "2026-09-18T13:42:47.236Z",
+  "generatedAt": "2026-09-19T11:47:15.624Z",
   "rootName": "mini-games",
   "scanDirs": [
     ".",
@@ -31,8 +31,8 @@ window.__GAMES_INDEX__ = {
         "建造"
       ],
       "group": "games",
-      "size": 59595,
-      "mtime": "2026-09-18T13:42:42.899Z",
+      "size": 97824,
+      "mtime": "2026-09-19T11:47:10.419Z",
       "order": 5
     },
     {
@@ -51,7 +51,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 25808,
-      "mtime": "2026-09-18T13:42:42.898Z",
+      "mtime": "2026-09-19T11:47:10.419Z",
       "order": 10
     },
     {
@@ -71,7 +71,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 15375,
-      "mtime": "2026-09-18T13:42:42.898Z",
+      "mtime": "2026-09-19T11:47:10.419Z",
       "order": 20
     },
     {
@@ -91,7 +91,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 48750,
-      "mtime": "2026-09-18T13:42:42.899Z",
+      "mtime": "2026-09-19T11:47:10.419Z",
       "order": 20
     }
   ]
