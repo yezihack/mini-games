@@ -148,10 +148,113 @@
     background:linear-gradient(160deg,rgba(255,255,255,.5),rgba(255,255,255,.25));
     box-shadow:0 6px 18px rgba(0,0,0,.4);
   }
+  /* ---------- 物品栏数量角标（生存模式） ---------- */
+  .slot .cnt{
+    position:absolute;right:4px;bottom:3px;font-size:10.5px;font-weight:700;
+    color:#fff;text-shadow:0 1px 3px #000,0 0 2px #000;
+  }
+  .slot.void{opacity:.30}
+
+  /* ---------- 生存状态：生命 / 饥饿 / 氧气 ---------- */
+  #vitals{
+    position:fixed;left:50%;bottom:80px;transform:translateX(-50%);
+    display:none;flex-direction:column;gap:3px;align-items:center;
+    pointer-events:none;z-index:12;
+  }
+  body.survival #vitals{display:flex}
+  #vitals .row{display:flex;gap:2px;height:16px;align-items:center}
+  #vitals svg{width:16px;height:16px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.7))}
+  /* 图标着色走 CSS：<path> 自己不写 fill，于是能继承 svg 上的 fill */
+  #hearts svg{fill:#39404f}
+  #hearts svg.full{fill:#ff4d63}
+  #hearts svg.half{fill:url(#halfHeart)}
+  #foodRow svg{fill:#3a4152}
+  #foodRow svg.full{fill:#e8a35c}
+  #foodRow svg.half{fill:url(#halfFood)}
+  #airRow svg{width:13px;height:13px}
+  .bub{fill:#bfe6ff;stroke:rgba(0,0,0,.35);stroke-width:1}
+  .bub.off{fill:none;stroke:rgba(255,255,255,.55);stroke-width:1.8}
+
+  /* ---------- 受伤红屏 ---------- */
+  #hurt{
+    position:fixed;inset:0;pointer-events:none;z-index:14;opacity:0;transition:opacity .22s ease-out;
+    background:radial-gradient(circle at 50% 50%,transparent 38%,rgba(196,22,44,.62) 100%);
+  }
+  #hurt.on{opacity:1;transition:opacity .04s}
+
+  /* ---------- 挖掘进度环 ---------- */
+  #digring{
+    position:fixed;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;
+    pointer-events:none;z-index:13;border-radius:50%;opacity:0;transition:opacity .1s;
+    background:conic-gradient(rgba(255,255,255,.95) calc(var(--p,0) * 1%), rgba(255,255,255,.13) 0);
+    -webkit-mask:radial-gradient(circle, transparent 0 62%, #000 63%);
+    mask:radial-gradient(circle, transparent 0 62%, #000 63%);
+  }
+  #digring.on{opacity:1}
+
+  /* ---------- 方块库 / 背包面板 ---------- */
+  #bag{
+    position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    background:rgba(4,7,13,.74);backdrop-filter:blur(6px);
+  }
+  #bag.show{display:flex}
+  .bagpanel{
+    width:min(700px,94vw);max-height:82vh;overflow:auto;border-radius:20px;padding:20px 22px;
+    background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
+    border:1px solid var(--panel-brd);box-shadow:0 30px 90px rgba(0,0,0,.72);
+  }
+  .bagpanel h2{margin:0 0 3px;font-size:17px;color:var(--accent)}
+  .bagpanel .sub{color:var(--dim);font-size:11.5px;margin-bottom:14px}
+  .baggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
+  .bg-item{
+    display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px;border-radius:11px;
+    cursor:pointer;border:1.5px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);
+    font-size:10.5px;color:var(--dim);transition:transform .1s,border-color .1s,color .1s;
+  }
+  .bg-item:hover{border-color:var(--accent);transform:translateY(-2px);color:var(--txt)}
+  .bg-item.sel{border-color:var(--ok);background:rgba(94,224,138,.10)}
+  .bg-item .sw{
+    width:26px;height:26px;border-radius:6px;
+    box-shadow:inset 0 -7px 0 rgba(0,0,0,.24),inset 0 5px 0 rgba(255,255,255,.20);
+  }
+  .bg-item .num{font-size:10px;font-weight:700;color:var(--txt)}
+  .bagempty{color:var(--dim);font-size:12.5px;padding:22px 0;text-align:center}
+
+  /* ---------- 死亡界面 ---------- */
+  #death{
+    position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+    background:radial-gradient(760px 500px at 50% 42%,rgba(214,34,58,.24),transparent 66%),rgba(12,2,5,.88);
+    backdrop-filter:blur(7px);
+  }
+  #death.show{display:flex}
+  #death .panel h1{background:linear-gradient(135deg,#ff8a9b,#c0304a);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+  /* ---------- 模式选择器 ---------- */
+  .modes{display:flex;gap:10px;justify-content:center;margin-bottom:18px}
+  .mode{
+    padding:9px 18px;border-radius:11px;border:1.5px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.05);color:var(--dim);font-size:13px;cursor:pointer;
+    font-family:inherit;transition:.15s;
+  }
+  .mode:hover{color:var(--txt);border-color:rgba(255,255,255,.3)}
+  .mode.on{color:#04121a;background:linear-gradient(135deg,#43e0ff,#7dd3fc);border-color:transparent;font-weight:600}
+  .mode[data-mode="1"].on{background:linear-gradient(135deg,#ffc061,#ff7a59);color:#240c02}
+
+  /* ---------- 浮动提示 ---------- */
+  #toast{
+    position:fixed;left:50%;top:74px;transform:translateX(-50%) translateY(-8px);z-index:26;
+    pointer-events:none;padding:8px 16px;border-radius:11px;font-size:12.5px;
+    background:var(--panel);border:1px solid var(--panel-brd);backdrop-filter:blur(10px);
+    opacity:0;transition:opacity .22s,transform .22s;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
   @media (max-width:820px){
     .keys{grid-template-columns:1fr}
     .slot{width:44px;height:44px}
     .slot .sw{width:20px;height:20px}
+    .baggrid{grid-template-columns:repeat(auto-fill,minmax(62px,1fr))}
+    #vitals{bottom:72px}
   }
   /* 手机横屏时 HUD 太挤，弱化说明卡 */
   @media (max-height:520px){
@@ -165,8 +268,27 @@
 
 <canvas id="gl"></canvas>
 
+<!-- 图标定义：心 / 鸡腿 / 气泡。图形本身不写 fill，让外层 CSS 按状态着色 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <path id="icHeart" d="M10 18.2C10 18.2 1.6 12.4 1.6 7.05A4.75 4.75 0 0 1 10 4.15a4.75 4.75 0 0 1 8.4 2.9C18.4 12.4 10 18.2 10 18.2Z"/>
+    <path id="icMeat" d="M12.6 2.2a5.1 5.1 0 0 0-4.4 7.65l-4.1 4.1a2.35 2.35 0 1 0 1.75 1.75l4.1-4.1A5.1 5.1 0 1 0 12.6 2.2Z"/>
+    <circle id="icBub" cx="6.5" cy="6.5" r="5.1"/>
+    <linearGradient id="halfHeart">
+      <stop offset="50%" stop-color="#ff4d63"/><stop offset="50%" stop-color="#39404f"/>
+    </linearGradient>
+    <linearGradient id="halfFood">
+      <stop offset="50%" stop-color="#e8a35c"/><stop offset="50%" stop-color="#3a4152"/>
+    </linearGradient>
+  </defs>
+</svg>
+
 <!-- 准星 -->
 <div id="cross"><i></i><i></i><i></i><i></i></div>
+<div id="digring"></div>
+
+<!-- 受伤红屏 -->
+<div id="hurt"></div>
 
 <!-- HUD -->
 <div class="hud">
@@ -179,12 +301,39 @@
     <div><kbd>Shift</kbd> 下降/潜行 · <kbd>F</kbd> 飞行 <span id="flyTag" class="dim">(关)</span></div>
     <div>左键挖掘 · 右键放置 · <kbd>1</kbd>-<kbd>9</kbd>/滚轮 换方块</div>
     <div>按住<kbd>右键</kbd>拖拽可调整视角 · <kbd>R</kbd> 回家</div>
-    <div><kbd>Esc</kbd> 暂停 · 地形可无限行走</div>
+    <div><kbd>E</kbd> 方块库 · <kbd>G</kbd> 切换模式 · <kbd>Esc</kbd> 暂停</div>
   </div>
+</div>
+
+<!-- 生存状态：生命 / 饥饿 / 氧气 -->
+<div id="vitals">
+  <div class="row" id="airRow"></div>
+  <div class="row" id="hearts"></div>
+  <div class="row" id="foodRow"></div>
 </div>
 
 <!-- 物品栏 -->
 <div id="hotbar"></div>
+
+<!-- 方块库（创造）/ 背包（生存） -->
+<div id="bag">
+  <div class="bagpanel">
+    <h2 id="bagTitle">方块库</h2>
+    <div class="sub" id="bagSub">点击任意方块放入当前选中的格子</div>
+    <div class="baggrid" id="bagGrid"></div>
+  </div>
+</div>
+
+<!-- 死亡界面 -->
+<div id="death">
+  <div class="panel">
+    <h1>你倒下了</h1>
+    <div class="tagline" id="deathMsg">生命值归零</div>
+    <button class="go" id="btnRespawn">重生</button>
+  </div>
+</div>
+
+<div id="toast"></div>
 
 <!-- 触屏控件 -->
 <div id="stick" class="touch"><div class="knob"></div></div>
@@ -201,15 +350,21 @@
   <div class="panel">
     <h1>方块世界</h1>
     <div class="tagline">手写 WebGL 体素引擎 · 无外部依赖 · 离线可玩</div>
+    <div class="modes">
+      <button class="mode on" data-mode="0">🌿 创造模式</button>
+      <button class="mode" data-mode="1">⚔️ 生存模式</button>
+    </div>
     <div class="keys">
       <div><kbd>W A S D</kbd> 四向移动</div>
       <div><kbd>空格</kbd> 跳跃 / 飞行上升</div>
       <div><kbd>Shift</kbd> 潜行 / 飞行下降</div>
-      <div><kbd>F</kbd> 切换飞行模式</div>
+      <div><kbd>F</kbd> 切换飞行（仅创造）</div>
       <div><kbd>鼠标左键</kbd> 挖掘方块</div>
-      <div><kbd>鼠标右键</kbd> 放置方块</div>
+      <div><kbd>鼠标右键</kbd> 放置 / 进食</div>
       <div><kbd>右键拖拽</kbd> 调整视角</div>
       <div><kbd>滚轮 / 1-9</kbd> 切换方块</div>
+      <div><kbd>E</kbd> 方块库 / 背包</div>
+      <div><kbd>G</kbd> 切换创造 / 生存</div>
       <div><kbd>R</kbd> 回到出生点</div>
       <div><kbd>Esc</kbd> 暂停 / 解锁鼠标</div>
     </div>
@@ -244,30 +399,126 @@ const EYE = 1.62;                    // 视点高度
 const PW = 0.30;                     // 玩家半径（AABB 半宽）
 
 /* 方块表：id → 属性
- * tex 用程序化噪声生成像素纹理，颜色决定观感；solid 决定是否碰撞/遮挡 */
+ *   top/side/bot : 顶面/侧面/底面的基础色（程序化着色，无贴图）
+ *   n            : 物品栏里显示的短名（1 个汉字）
+ *   hard         : 生存模式挖掘耗时（秒）；liquid 的方块不可挖
+ *   drop         : 掉落物 id（默认掉自己；0 = 不掉落）
+ *   dropN        : 掉落数量（默认 1）
+ *   bonus        : 额外掉落 { id, p, n } —— 例如树叶掉苹果
+ *   ore          : 矿点色，配合斜向纹样让矿石一眼可辨
+ *   hurt         : 接触伤害（仙人掌）
+ *   light        : 自发光（AO 设下限，看起来在发亮）
+ *   alpha        : 半透明（玻璃/冰）—— 不遮挡邻面
+ *   liquid       : 液体（水/岩浆）—— 不碰撞、可被替换
+ *   hot          : 岩浆等高温流体，接触扣血
+ * 注意：1~15 的 id 已被地形生成、射线、音效等处的既有逻辑引用，语义不可改。 */
 const BLOCKS = [
   null,
-  { name:'草方块', top:[ 96,168, 74], side:[124,150, 78], bot:[134,102, 68], n:'草' },
-  { name:'泥土',   top:[134,102, 68], side:[134,102, 68], bot:[134,102, 68], n:'土' },
-  { name:'石头',   top:[132,134,138], side:[132,134,138], bot:[132,134,138], n:'石' },
-  { name:'圆石',   top:[110,112,116], side:[110,112,116], bot:[110,112,116], n:'圆' },
-  { name:'沙子',   top:[223,209,152], side:[223,209,152], bot:[223,209,152], n:'沙' },
-  { name:'原木',   top:[164,129, 80], side:[ 96, 68, 42], bot:[164,129, 80], n:'木' },
-  { name:'树叶',   top:[ 62,140, 62], side:[ 56,128, 56], bot:[ 62,140, 62], n:'叶' },
-  { name:'木板',   top:[176,140, 88], side:[176,140, 88], bot:[176,140, 88], n:'板' },
-  { name:'砖块',   top:[164, 84, 70], side:[164, 84, 70], bot:[164, 84, 70], n:'砖' },
-  { name:'玻璃',   top:[190,220,240], side:[190,220,240], bot:[190,220,240], n:'玻', alpha:.45 },
+  { name:'草方块', top:[ 96,168, 74], side:[124,150, 78], bot:[134,102, 68], n:'草', hard:.45, drop:2 },
+  { name:'泥土',   top:[134,102, 68], side:[134,102, 68], bot:[134,102, 68], n:'土', hard:.40 },
+  { name:'石头',   top:[132,134,138], side:[132,134,138], bot:[132,134,138], n:'石', hard:1.50, drop:4 },
+  { name:'圆石',   top:[110,112,116], side:[110,112,116], bot:[110,112,116], n:'圆', hard:1.40 },
+  { name:'沙子',   top:[223,209,152], side:[223,209,152], bot:[223,209,152], n:'沙', hard:.40 },
+  { name:'原木',   top:[164,129, 80], side:[ 96, 68, 42], bot:[164,129, 80], n:'木', hard:.90 },
+  { name:'树叶',   top:[ 62,140, 62], side:[ 56,128, 56], bot:[ 62,140, 62], n:'叶', hard:.25, drop:0,
+    bonus:{ id:200, p:.14 } },
+  { name:'木板',   top:[176,140, 88], side:[176,140, 88], bot:[176,140, 88], n:'板', hard:.80 },
+  { name:'砖块',   top:[164, 84, 70], side:[164, 84, 70], bot:[164, 84, 70], n:'砖', hard:1.60 },
+  { name:'玻璃',   top:[190,220,240], side:[190,220,240], bot:[190,220,240], n:'玻', alpha:.45, hard:.30, drop:0 },
   { name:'水',     top:[ 56,118,200], side:[ 50,106,186], bot:[ 50,106,186], n:'水', alpha:.62, liquid:true },
-  { name:'雪块',   top:[238,243,250], side:[238,243,250], bot:[238,243,250], n:'雪' },
-  { name:'黑曜石', top:[ 34, 28, 48], side:[ 34, 28, 48], bot:[ 34, 28, 48], n:'曜' },
-  { name:'萤石',   top:[252,228,140], side:[248,214,120], bot:[248,214,120], n:'萤', light:1 },
-  { name:'南瓜',   top:[226,146, 46], side:[216,132, 40], bot:[226,146, 46], n:'瓜' },
+  { name:'雪块',   top:[238,243,250], side:[238,243,250], bot:[238,243,250], n:'雪', hard:.25 },
+  { name:'黑曜石', top:[ 34, 28, 48], side:[ 34, 28, 48], bot:[ 34, 28, 48], n:'曜', hard:6.00 },
+  { name:'萤石',   top:[252,228,140], side:[248,214,120], bot:[248,214,120], n:'萤', light:1, hard:1.20 },
+  { name:'南瓜',   top:[226,146, 46], side:[216,132, 40], bot:[226,146, 46], n:'瓜', hard:.70 },
+
+  /* ---------------- 新增方块：建材与地貌 ---------------- */
+  { name:'沙岩',   top:[222,208,158], side:[214,199,148], bot:[196,180,132], n:'岩', hard:1.30 },
+  { name:'石砖',   top:[126,128,132], side:[126,128,132], bot:[126,128,132], n:'砖', hard:1.50 },
+  { name:'苔石',   top:[100,118, 88], side:[ 92,110, 82], bot:[ 92,110, 82], n:'苔', hard:1.40 },
+  { name:'粘土',   top:[160,168,178], side:[152,160,172], bot:[152,160,172], n:'粘', hard:.55 },
+  { name:'冰块',   top:[176,214,242], side:[166,206,238], bot:[166,206,238], n:'冰', alpha:.66, hard:.50 },
+  { name:'书架',   top:[176,140, 88], side:[146,112, 66], bot:[176,140, 88], n:'书', hard:.85 },
+  { name:'仙人掌', top:[ 78,140, 70], side:[ 62,120, 58], bot:[ 78,140, 70], n:'掌', hard:.45, hurt:1 },
+  { name:'南瓜灯', top:[240,166, 62], side:[232,146, 44], bot:[226,146, 46], n:'灯', light:1, hard:.70 },
+  { name:'岩浆',   top:[232,118, 36], side:[214, 88, 24], bot:[198, 74, 18], n:'岩', liquid:true, hot:true, light:1, alpha:.85 },
+  { name:'羊毛·白', top:[236,238,242], side:[236,238,242], bot:[236,238,242], n:'白', hard:.35 },
+  { name:'羊毛·红', top:[196, 62, 62], side:[196, 62, 62], bot:[196, 62, 62], n:'红', hard:.35 },
+  { name:'羊毛·蓝', top:[ 62, 92,196], side:[ 62, 92,196], bot:[ 62, 92,196], n:'蓝', hard:.35 },
+  { name:'羊毛·黄', top:[226,198, 66], side:[226,198, 66], bot:[226,198, 66], n:'黄', hard:.35 },
+  { name:'羊毛·绿', top:[ 84,166, 84], side:[ 84,166, 84], bot:[ 84,166, 84], n:'绿', hard:.35 },
+  { name:'羊毛·黑', top:[ 56, 56, 62], side:[ 56, 56, 62], bot:[ 56, 56, 62], n:'黑', hard:.35 },
+  { name:'石英块', top:[232,230,226], side:[232,230,226], bot:[232,230,226], n:'英', hard:1.10 },
+  { name:'深色木板', top:[116, 84, 52], side:[116, 84, 52], bot:[116, 84, 52], n:'深', hard:.80 },
+
+  /* ---------------- 矿石：石底 + 斜向矿点纹 ---------------- */
+  { name:'煤矿石',   top:[132,134,138], side:[132,134,138], bot:[132,134,138], n:'煤', hard:2.2, ore:[ 40, 40, 44] },
+  { name:'铁矿石',   top:[132,134,138], side:[132,134,138], bot:[132,134,138], n:'铁', hard:2.6, ore:[202,148,110] },
+  { name:'金矿石',   top:[132,134,138], side:[132,134,138], bot:[132,134,138], n:'金', hard:3.0, ore:[238,196, 74] },
+  { name:'钻石矿石', top:[132,134,138], side:[132,134,138], bot:[132,134,138], n:'钻', hard:3.4, ore:[ 92,226,232] },
+  { name:'红石矿石', top:[132,134,138], side:[132,134,138], bot:[132,134,138], n:'红', hard:2.8, ore:[212, 58, 58] },
+
+  /* ---------------- 农作物 ---------------- */
+  { name:'胡萝卜丛', top:[106,168, 72], side:[ 96,142, 68], bot:[134,102, 68], n:'萝', hard:.30, drop:201, dropN:2 },
 ];
 const SOLID = {};                    // id → 是否实体
 BLOCKS.forEach((b, i) => { if (b) SOLID[i] = !b.liquid; });
 
-/* 物品栏（9 格），值 = 方块 id */
-const HOTBAR = [1, 3, 4, 2, 8, 6, 7, 9, 14];
+/* 方块 id 别名。
+ * 逻辑代码一律用 I.XXX 而不是裸数字 —— 往表里插一种新方块会顶掉后面所有
+ * id，裸数字会静默串味（本次加方块时就踩到了：19 从「煤」变成「粘土」）。 */
+const ID = {};
+BLOCKS.forEach((b, i) => { if (b) ID[b.name] = i; });
+const I = {
+  AIR: 0,
+  GRASS: ID['草方块'], DIRT: ID['泥土'], STONE: ID['石头'], COBBLE: ID['圆石'], SAND: ID['沙子'],
+  LOG: ID['原木'], LEAF: ID['树叶'], PLANK: ID['木板'], BRICK: ID['砖块'], GLASS: ID['玻璃'],
+  WATER: ID['水'], SNOW: ID['雪块'], OBSIDIAN: ID['黑曜石'], GLOW: ID['萤石'], PUMPKIN: ID['南瓜'],
+  SANDSTONE: ID['沙岩'], STONEBRICK: ID['石砖'], MOSS: ID['苔石'], CLAY: ID['粘土'],
+  ICE: ID['冰块'], BOOKSHELF: ID['书架'], CACTUS: ID['仙人掌'], LAMP: ID['南瓜灯'], LAVA: ID['岩浆'],
+  COAL: ID['煤矿石'], IRON: ID['铁矿石'], GOLD: ID['金矿石'], DIAMOND: ID['钻石矿石'],
+  REDSTONE: ID['红石矿石'], CARROT: ID['胡萝卜丛'],
+};
+/* 名字写错会静默拿到 undefined —— 早失败早发现 */
+for (const k in I) if (I[k] === undefined) throw new Error('方块别名未定义: ' + k);
+
+/* 方块 id 的上界：>= ID_ITEM_BASE 的都是物品（不可放置） */
+const ID_ITEM_BASE = 200;
+const isBlockId = (id) => id > 0 && id < ID_ITEM_BASE;
+
+/* 物品表（非方块）：食物等，右键使用 */
+const ITEMS = {
+  200: { name:'苹果',   n:'果', color:[212, 62, 62], food:4 },
+  201: { name:'胡萝卜', n:'萝', color:[232,132, 42], food:3 },
+};
+for (const k in ITEMS) ITEMS[k].id = +k;
+
+/* 取定义（方块或物品通用） */
+const defOf = (id) => (id > 0 ? (isBlockId(id) ? BLOCKS[id] : ITEMS[id]) : null);
+/* 用于 UI 展示的颜色 */
+function defColor(id) {
+  const d = defOf(id);
+  if (!d) return [70, 76, 90];
+  return d.side || d.color;
+}
+const defName = (id) => { const d = defOf(id); return d ? d.name : '空格'; };
+const defShort = (id) => { const d = defOf(id); return d ? d.n : ''; };
+
+/* 挖掘耗时：液体不可挖（返回 Infinity），未标注的用默认值 */
+function breakTime(id) {
+  const B = BLOCKS[id];
+  if (!B || B.liquid) return Infinity;
+  return B.hard === undefined ? 0.6 : B.hard;
+}
+/* 掉落物：草→泥土、石头→圆石，其余掉自己 */
+function dropOf(id) {
+  const B = BLOCKS[id];
+  if (!B) return 0;
+  return B.drop === undefined ? id : B.drop;
+}
+const dropCountOf = (id) => BLOCKS[id] && BLOCKS[id].dropN ? BLOCKS[id].dropN : 1;
+
+/* 创造模式默认物品栏（9 格），生存模式会换成玩家自己的背包 */
+const HOTBAR = [I.GRASS, I.STONE, I.COBBLE, I.PLANK, I.STONEBRICK, I.BRICK, I.GLASS, I.PUMPKIN, I.LAMP];
 
 /* ============================== 数学工具 ============================== */
 const M4 = {
@@ -388,12 +639,21 @@ function getEffective(x, y, z) {
   return world[IDX(wrapX(x | 0), y | 0, wrapZ(z | 0))];
 }
 const isSolid = (id) => id > 0 && SOLID[id] === true;
-/* 不透明 = 实体且非玻璃/水（决定邻面是否剔除） */
-const isOpaque = (id) => id > 0 && id !== 10 && id !== 11;
+/* 不透明 = 实体且不带半透明标记（玻璃/冰/水/岩浆都会让邻面保留，
+ * 否则会从外面看到「贴在玻璃背面的石头」这种穿帮） */
+const isOpaque = (id) => {
+  if (!(id > 0)) return false;
+  const B = BLOCKS[id];
+  return !!B && !B.alpha && !B.liquid;
+};
+/* 同类半透明方块之间不画内部面（两块并排的玻璃只留外壳） */
+const isClearLike = (id) => { const B = BLOCKS[id]; return !!B && (!!B.alpha || !!B.liquid); };
+const isLiquid = (id) => { const B = BLOCKS[id]; return !!B && !!B.liquid; };
 
 /* ------------------------------ 地形生成 ------------------------------ */
 function generate(seed) {
   const heights = new Int16Array(W * D);
+  const biome = new Uint8Array(W * D);      // 0 平原 / 1 沙漠 / 2 雪原
   for (let z = 0; z < D; z++) {
     for (let x = 0; x < W; x++) {
       // 大陆起伏 + 细节 + 山脊
@@ -405,36 +665,66 @@ function generate(seed) {
         + (detail - 0.5) * 4
         + Math.pow(ridge, 3) * 11 * (base > 0.52 ? 1 : 0.25);
       heights[z * W + x] = clamp(Math.round(h), 4, H - 8);
+      // 生物群系：温度（纬度向）+ 湿度（噪声）
+      const temp = 1 - z / D * 0.75 + (fbm(x * 0.02, z * 0.02, seed + 77, 2) - 0.5) * 0.5;
+      const wet = fbm(x * 0.025, z * 0.025, seed + 313, 2);
+      biome[z * W + x] = temp < 0.34 ? 2 : (wet < 0.38 && temp > 0.5 ? 1 : 0);
     }
   }
 
   for (let z = 0; z < D; z++) {
     for (let x = 0; x < W; x++) {
       const h = heights[z * W + x];
-      // 生物群系：温度（纬度向）+ 湿度（噪声）
-      const temp = 1 - z / D * 0.75 + (fbm(x * 0.02, z * 0.02, seed + 77, 2) - 0.5) * 0.5;
-      const wet = fbm(x * 0.025, z * 0.025, seed + 313, 2);
-      const desert = wet < 0.38 && temp > 0.5;
-      const snowy = temp < 0.34;
+      const bio = biome[z * W + x];
+      const desert = bio === 1, snowy = bio === 2;
 
       for (let y = 0; y <= h; y++) {
         let id;
-        if (y === 0) id = 13;                                // 基岩层黑曜石
+        if (y === 0) id = I.OBSIDIAN;                        // 基岩层
         else if (y === h) {
-          if (h <= SEA) id = 5;                              // 水下沙
-          else if (snowy) id = 12;
-          else if (desert) id = 5;
-          else id = 1;
+          if (h <= SEA) id = I.SAND;                         // 水下沙
+          // 雪原低地结一层冰壳 —— 本种子的雪原都在海平面以上，
+          // 只有放宽到 SEA+6 才真的能在地表见到冰块
+          else if (snowy) id = h <= SEA + 6 ? I.ICE : I.SNOW;
+          else if (desert) id = I.SAND;
+          else id = I.GRASS;
         } else if (y > h - 4) {
-          id = desert ? 5 : 2;                               // 表层 3 格
+          if (desert) id = y >= h - 1 ? I.SAND : I.SANDSTONE;   // 沙漠：一层沙 + 沙岩
+          else if (h <= SEA && y > h - 2) id = I.CLAY;          // 浅水边沉积粘土
+          else id = I.DIRT;                                     // 表层 3 格泥土
         } else {
-          // 石头里掺一点矿脉般的圆石
-          id = fbm(x * 0.14, (z + y * 7) * 0.14, seed + 4242, 2) > 0.62 ? 4 : 3;
+          id = stoneAt(x, y, z, h, seed);                    // 石头层：矿脉 + 苔石 + 圆石
         }
         world[IDX(x, y, z)] = id;
       }
-      // 水填充
-      if (h < SEA) for (let y = h + 1; y <= SEA; y++) world[IDX(x, y, z)] = 11;
+      // 水填充：雪原的湖面结冰
+      if (h < SEA) for (let y = h + 1; y <= SEA; y++)
+        world[IDX(x, y, z)] = (snowy && y === SEA) ? I.ICE : I.WATER;
+    }
+  }
+
+  // ---------------------- 地表小装饰：南瓜 / 胡萝卜 / 仙人掌 ----------------------
+  /* 密度很低，让探索时有「顺手捡到」的惊喜。
+   * 胡萝卜丛会掉 2 个胡萝卜 —— 生存模式下的主要食物来源之一；
+   * 仙人掌按 1~3 节成柱，长在沙漠上，碰到会掉血。 */
+  let pumpkins = 0, carrots = 0, cacti = 0;
+  for (let z = 2; z < D - 2; z++) {
+    for (let x = 2; x < W - 2; x++) {
+      const h = heights[z * W + x];
+      if (h <= SEA) continue;                             // 水下不长
+      const bio = biome[z * W + x];
+      const ground = getBlock(x, h, z);
+      const r = hash2(x, z, seed + 5150);
+      if (bio === 1 && ground === I.SAND) {               // 沙漠：仙人掌
+        if (r > 0.970) {
+          const ht = 1 + Math.floor(hash2(x + 3, z + 3, seed) * 3);
+          for (let i = 1; i <= ht; i++) setBase(x, h + i, z, I.CACTUS);
+          cacti++;
+        }
+      } else if (ground === I.GRASS) {                    // 草地：南瓜 / 胡萝卜
+        if (r > 0.9955) { setBase(x, h + 1, z, I.PUMPKIN); pumpkins++; }
+        else if (r > 0.9885) { setBase(x, h + 1, z, I.CARROT); carrots++; }
+      }
     }
   }
 
@@ -444,17 +734,18 @@ function generate(seed) {
     for (let x = 3; x < W - 3; x++) {
       const h = heights[z * W + x];
       if (h <= SEA + 1) continue;                       // 水里不长
-      if (getBlock(x, h, z) !== 1 && getBlock(x, h, z) !== 12) continue;
+      const g = getBlock(x, h, z);
+      if (g !== I.GRASS && g !== I.SNOW) continue;
       if (hash2(x, z, seed + 1234) > 0.012) continue;    // 稀疏分布
       // 简单间距检查，避免树挤在一起
       let ok = true;
       for (let dz = -2; dz <= 2 && ok; dz++)
         for (let dx = -2; dx <= 2 && ok; dx++)
-          if (getBlock(x + dx, getBlock(x + dx, h + 4, z + dz) ? h + 4 : h, z + dz) === 6) ok = false;
+          if (getBlock(x + dx, getBlock(x + dx, h + 4, z + dz) ? h + 4 : h, z + dz) === I.LOG) ok = false;
       if (!ok) continue;
 
       const th = 4 + Math.floor(hash2(x + 9, z + 9, seed) * 3);
-      for (let i = 1; i <= th; i++) setBase(x, h + i, z, 6);
+      for (let i = 1; i <= th; i++) setBase(x, h + i, z, I.LOG);
       // 树冠：球形，半径 2
       const top = h + th;
       for (let dy = -2; dy <= 2; dy++)
@@ -464,14 +755,53 @@ function generate(seed) {
             if (r > 3) continue;
             if (r === 3 && hash2(dx + x, dz + z, seed + dy) > 0.5) continue;
             const bx = x + dx, by = top + dy, bz = z + dz;
-            if (getBlock(bx, by, bz) === 0) setBase(bx, by, bz, 7);
+            if (getBlock(bx, by, bz) === 0) setBase(bx, by, bz, I.LEAF);
           }
       trees++;
     }
   }
 
-  // -------------------------- 萤石小径 --------------------------
-  return { heights, trees };
+  // ---------------------------- 统计 ----------------------------
+  let oreCount = 0, lavaCount = 0;
+  for (let i = 0; i < world.length; i++) {
+    const v = world[i];
+    if (v === I.COAL || v === I.IRON || v === I.GOLD || v === I.DIAMOND || v === I.REDSTONE) oreCount++;
+    else if (v === I.LAVA) lavaCount++;
+  }
+  return { heights, trees, pumpkins, carrots, cacti, oreCount, lavaCount };
+}
+
+/* 矿脉噪声：把 y 混进两个轴，让矿脉在纵向也连成团块，而不是水平薄片 */
+function oreVein(x, y, z, seed, off) {
+  return fbm(x * 0.13 + y * 0.21, z * 0.13 - y * 0.17, seed + off, 2);
+}
+
+/* 深层岩浆：只在最底部几层，用低频噪声围出一片「岩浆海」，
+ * 挖穿到最深处会真的掉进去掉血 —— 给深挖一个实打实的风险。 */
+function lavaAt(x, y, z, seed) {
+  if (y > 4) return 0;
+  return fbm(x * 0.05, z * 0.05, seed + 8863, 2) > 0.55 ? I.LAVA : 0;
+}
+
+/* 石头层内容。
+ * 每种矿用一条独立噪声（seed 偏移不同），所以它们互不吞并；
+ * 阈值 + 深度上下界一起决定「矿石总量」与「分布深度」。
+ *
+ * 阈值不是拍脑袋定的：oreVein 的实际分布比想象中窄得多
+ * （>0.85 只占 0.21%，>0.90 只剩 0.012%），所以先跑一遍分位数反解，
+ * 照着下面这些目标块数把阈值求出来的：
+ *   煤 5000 / 苔石 3000 / 铁 1600 / 红石 800 / 金 380 / 钻石 130
+ * 想调整稀有度，改阈值更要紧的是看最终生成数量，不要凭直觉猜。 */
+function stoneAt(x, y, z, h, seed) {
+  const lava = lavaAt(x, y, z, seed);
+  if (lava) return lava;                                                   // 深层岩浆海
+  if (y <  8 && oreVein(x, y, z, seed, 8801) > 0.8515) return I.DIAMOND;   // 钻石（最深）
+  if (y < 12 && oreVein(x, y, z, seed, 8807) > 0.8991) return I.GOLD;      // 金
+  if (y < 18 && oreVein(x, y, z, seed, 8819) > 0.8732) return I.REDSTONE;  // 红石
+  if (y < 26 && oreVein(x, y, z, seed, 8821) > 0.8715) return I.IRON;      // 铁
+  if (oreVein(x, y, z, seed, 8837) > 0.8398) return I.COAL;               // 煤（全深度都有）
+  if (oreVein(x, y, z, seed, 8849) > 0.8461) return I.MOSS;               // 苔石团
+  return fbm(x * 0.14, (z + y * 7) * 0.14, seed + 4242, 2) > 0.62 ? I.COBBLE : I.STONE;
 }
 
 /* 出生点：地表最高的干燥位置 */
@@ -596,6 +926,10 @@ function vertexAO(side1, side2, corner) {
   return 1 - (side1 + side2 + corner) * 0.16;
 }
 
+/* 矿石的矿点纹样：四种顶点里挑两个上矿点色，形成斜向的「矿脉感」。
+ * 用 (x, z, 面序号) 哈希在三种对角纹样里选一种，相邻方块自然错开。 */
+const ORE_PAT = [[0, 3], [1, 2], [0, 2]];
+
 /* 构建一个区块的几何：面剔除 + AO 烘焙，一次性写入 VBO */
 function buildChunk(c) {
   const pos = [], col = [], ao = [];
@@ -612,11 +946,14 @@ function buildChunk(c) {
           const nx = x + F.n[0], ny = y + F.n[1], nz = z + F.n[2];
           const nb = getEffective(nx, ny, nz);
           if (isOpaque(nb)) continue;              // 被邻居挡住 → 剔面
-          if (nb === id && (id === 10 || id === 11)) continue; // 同类玻璃/水不画内部面
+          if (nb === id && isClearLike(id)) continue; // 同类的玻璃/水/冰不画内部面
 
           // 面颜色：顶/底面用 top/bot，侧面用 side
           const base = F.n[1] > 0 ? B.top : F.n[1] < 0 ? B.bot : B.side;
           const s = F.shade;
+
+          // 矿石：给这个面的两个顶点换上矿点色，形成斜向纹样
+          const orePat = B.ore ? ORE_PAT[Math.floor(hash2(x, z, 313 + f) * 3)] : null;
 
           // AO：沿面切线方向取 3 个邻居
           const ax = F.n[0] !== 0 ? 1 : 0, ay = F.n[1] !== 0 ? 1 : 0, az = F.n[2] !== 0 ? 1 : 0;
@@ -637,8 +974,10 @@ function buildChunk(c) {
 
             // 顶点位置加一点点世界偏移做纹理抖动，避免大色块的死板
             const jitter = ((hash2(x * 4 + k, z * 4 + f, y) - 0.5) * 0.018);
+            // 矿点：这个顶点若落在矿脉纹样上，就换成矿点色
+            const c = (orePat && orePat.indexOf(k) >= 0) ? B.ore : base;
             pos.push(x + v[0] + F.n[0] * 0, y + v[1], z + v[2]);
-            col.push(base[0] * s / 255, base[1] * s / 255, base[2] * s / 255);
+            col.push(c[0] * s / 255, c[1] * s / 255, c[2] * s / 255);
             ao.push(a + jitter);
           }
         }
@@ -812,7 +1151,17 @@ const player = {
   fly: false,
   onGround: false,
   inWater: false,
+  inLava: false,
   spawn: [0, 30, 0],
+  /* --- 生存模式状态（创造模式下不使用，但始终存在，UI 才不会读到 undefined） --- */
+  hp: 20, maxHp: 20,
+  food: 20, maxFood: 20,
+  air: 10, maxAir: 10,
+  dead: false,
+  fallPeak: null,       // 离地后到达过的最高点，用于算坠落高度
+  exhaust: 0,           // 消耗度，攒满 4 扣 1 点饥饿
+  hurtFlash: 0,         // 受伤红屏剩余时间
+  drownT: 0, lavaT: 0, cactusT: 0, regenT: 0, starveT: 0,
 };
 
 /* 沿单轴移动并解决与方块的碰撞（AABB 扫掠的简化逐轴解法） */
@@ -845,7 +1194,13 @@ function moveAxis(axis, amount) {
 
 function updatePhysics(dt, input) {
   const p = player;
-  p.inWater = getEffective(Math.floor(p.x), Math.floor(p.y + 0.9), Math.floor(p.z)) === 11;
+  // 流体判定：脚部与头部各取一次，任一为水/岩浆都算浸泡
+  const fx = Math.floor(p.x), fz = Math.floor(p.z);
+  const feetId = getEffective(fx, Math.floor(p.y + 0.9), fz);
+  const headId = getEffective(fx, Math.floor(p.y + EYE), fz);
+  const hot = (BLOCKS[feetId] && BLOCKS[feetId].hot) || (BLOCKS[headId] && BLOCKS[headId].hot);
+  p.inLava = !!hot;
+  p.inWater = !hot && (feetId === I.WATER || headId === I.WATER);
 
   // 目标速度
   const cy = Math.cos(p.yaw), sy = Math.sin(p.yaw);
@@ -858,7 +1213,7 @@ function updatePhysics(dt, input) {
   if (len > 0) { wishX /= len; wishZ /= len; }
 
   const sprint = input.shift && !p.fly ? 1.45 : 1;
-  let speed = (p.fly ? 13 : p.inWater ? 3.4 : 4.9) * sprint;
+  let speed = (p.fly ? 13 : p.inLava ? 1.7 : p.inWater ? 3.4 : 4.9) * sprint;
   if (input.sprint) speed *= 1.25;
 
   if (p.fly) {
@@ -873,9 +1228,11 @@ function updatePhysics(dt, input) {
     const accel = p.onGround ? 22 : 7;
     p.vx += (wishX * speed - p.vx) * Math.min(1, accel * dt);
     p.vz += (wishZ * speed - p.vz) * Math.min(1, accel * dt);
-    const g = p.inWater ? 6 : G;
+    // 岩浆又稠又重：下沉快、几乎跳不起来
+    const g = p.inLava ? 11 : p.inWater ? 6 : G;
     p.vy -= g * dt;
-    if (p.inWater) { p.vy = Math.max(p.vy, -3.2); p.vx *= 0.94; p.vz *= 0.94; }
+    if (p.inLava) { p.vy = Math.max(p.vy, -1.2); p.vx *= 0.80; p.vz *= 0.80; }
+    else if (p.inWater) { p.vy = Math.max(p.vy, -3.2); p.vx *= 0.94; p.vz *= 0.94; }
     if (input.jump && (p.onGround || p.inWater)) { p.vy = p.inWater ? 4.2 : JUMP_V; p.onGround = false; }
   }
 
@@ -887,10 +1244,7 @@ function updatePhysics(dt, input) {
   // 无横向边界：地形向外平铺，走多远都不会撞墙
   if (p.y < 1) { p.vy = 0; p.y = Math.max(2, p.y); }
   // 掉出世界底部（挖穿了基岩）才回出生点
-  if (p.y < -6) {
-    p.x = p.spawn[0]; p.y = p.spawn[1]; p.z = p.spawn[2];
-    p.vx = p.vy = p.vz = 0;
-  }
+  if (p.y < -6) respawn();
 }
 
 /* --------------------------- DDA 体素射线拾取 --------------------------- */
@@ -915,7 +1269,8 @@ function raycast(maxDist) {
     if (t > maxDist) return null;
     const id = getEffective(x, y, z);
     // 站在方块上往下看时，脚下那块要能挖；但同层的方块不能挖（否则会挖进自己身体）
-    if (id && id !== 11 && !insideSelf(x, y, z)) return { x, y, z, nx, ny, nz, id, dist: t };
+    // 液体（水/岩浆）一律不可选 —— 不然射线会停在水面上，没法挖水底的方块
+    if (id && !isLiquid(id) && !insideSelf(x, y, z)) return { x, y, z, nx, ny, nz, id, dist: t };
     if (tMaxX < tMaxY && tMaxX < tMaxZ) { x += stepX; t = tMaxX; tMaxX += tDeltaX; nx = -stepX; ny = 0; nz = 0; }
     else if (tMaxY < tMaxZ) { y += stepY; t = tMaxY; tMaxY += tDeltaY; nx = 0; ny = -stepY; nz = 0; }
     else { z += stepZ; t = tMaxZ; tMaxZ += tDeltaZ; nx = 0; ny = 0; nz = -stepZ; }
@@ -931,6 +1286,236 @@ function insideSelf(x, y, z) {
   const bodyY = Math.floor(p.y);
   if (y !== bodyY) return false;
   return x + 1 > p.x - PW && x < p.x + PW && z + 1 > p.z - PW && z < p.z + PW;
+}
+
+/* ============================== 生存模式 ============================== */
+/* 这一节是纯逻辑：不碰 DOM、不碰 WebGL，所以能整段抽到 Node 里跑测试。
+ * 与界面相关的一切都通过 onHurt / onDeath 两个钩子回调出去
+ * （无头测试里它们保持为 null，于是完全解耦）。 */
+const MODE = { CREATIVE: 0, SURVIVAL: 1 };
+let mode = MODE.CREATIVE;
+
+/* 生存数值的调参集中在这里，方便一把改齐 */
+const SURV = {
+  fallSafe: 3.4,        // 这个高度以内落地不掉血
+  drownDps: 2,          // 缺氧后每秒扣血
+  drownDelay: 1,        // 缺氧后多久开始扣血
+  airRefill: 5,         // 露出水面后每秒回多少氧气
+  lavaDps: 4,           // 岩浆每秒伤害（按 lavaTick 折算到每次结算）
+  lavaTick: 0.5,
+  cactusDmg: 1,         // 仙人掌伤害
+  cactusTick: 0.6,
+  exhaustIdle: 0.018,   // 静立每秒消耗度
+  exhaustWalk: 0.100,   // 移动
+  exhaustRun: 0.300,    // 冲刺
+  exhaustPerFood: 4,    // 攒满多少消耗度扣 1 点饥饿
+  regenFood: 16,        // 饥饿高于此值才会自然回血
+  regenInterval: 3,     // 回 1 点血的间隔（秒）
+  regenCost: 3,         // 每次回血额外增加的消耗度
+  starveInterval: 4,    // 饿到 0 之后多久扣 1 点血
+};
+
+/* --- 背包：id → 数量。创造模式下不使用 --- */
+const inv = new Map();
+let invDirty = false;                 // 通知 UI 刷新（由主循环消费）
+const invCount = (id) => inv.get(id) | 0;
+function invAdd(id, n = 1) {
+  if (!id || n <= 0) return;
+  inv.set(id, invCount(id) + n);
+  autoSlot(id);
+  invDirty = true;
+}
+function invTake(id, n = 1) {
+  const c = invCount(id);
+  if (c < n) return false;
+  if (c === n) inv.delete(id); else inv.set(id, c - n);
+  invDirty = true;
+  return true;
+}
+
+/* --- 生存模式的 9 格快捷栏（与创造模式的 HOTBAR 结构一致） --- */
+const invSlots = new Array(9).fill(0);
+const activeSlots = () => (mode === MODE.SURVIVAL ? invSlots : HOTBAR);
+/* 当前手持的物品 id（0 = 空手） */
+const heldId = () => activeSlots()[selected] | 0;
+
+/* 捡到新东西时自动占一个空格，省得每次都要手动摆 */
+function autoSlot(id) {
+  if (mode !== MODE.SURVIVAL) return;
+  if (invSlots.indexOf(id) >= 0) return;
+  const i = invSlots.indexOf(0);
+  if (i >= 0) invSlots[i] = id;
+  invDirty = true;
+}
+
+/* --- 事件钩子（UI 层注入） --- */
+let onHurt = null, onDeath = null;
+
+function hurt(n) {
+  const p = player;
+  if (n <= 0 || p.dead) return -1;
+  p.hp = Math.max(0, p.hp - n);
+  p.hurtFlash = 0.42;
+  if (onHurt) onHurt(n);
+  if (p.hp <= 0) die();
+  return p.hp;
+}
+function heal(n) {
+  const p = player;
+  if (p.dead) return;
+  p.hp = Math.min(p.maxHp, p.hp + n);
+}
+function die() {
+  const p = player;
+  if (p.dead) return;
+  p.dead = true;
+  p.fallPeak = null;
+  if (onDeath) onDeath();
+}
+/* 复活：回到出生点、数值全满。物品保留（不做掉落惩罚，避免劝退） */
+function respawn() {
+  const p = player;
+  p.hp = p.maxHp; p.food = p.maxFood; p.air = p.maxAir;
+  p.dead = false; p.fallPeak = null; p.exhaust = 0;
+  p.drownT = p.lavaT = p.cactusT = p.regenT = p.starveT = 0;
+  p.hurtFlash = 0;
+  p.x = p.spawn[0]; p.y = p.spawn[1]; p.z = p.spawn[2];
+  p.vx = p.vy = p.vz = 0;
+}
+
+/* 吃东西：返回是否真的吃到了 */
+function tryEat(id) {
+  const d = ITEMS[id];
+  const p = player;
+  if (!d || !d.food || p.dead) return false;
+  if (p.food >= p.maxFood) return false;
+  if (!invTake(id, 1)) return false;
+  p.food = Math.min(p.maxFood, p.food + d.food);
+  return true;
+}
+
+/* --- 掉落 --- */
+/* 破坏方块后进背包。bonus 是概率掉落（树叶掉苹果）。
+ * roll 参数是为了让测试能确定性地驱动概率分支。 */
+function collectDrop(id, roll = Math.random) {
+  const B = BLOCKS[id];
+  if (!B) return 0;
+  const got = dropOf(id);
+  if (got) invAdd(got, dropCountOf(id));
+  if (B.bonus && roll() < B.bonus.p) invAdd(B.bonus.id, B.bonus.n || 1);
+  return got;
+}
+
+/* --- 每帧推进生存状态。创造模式只维护受伤红屏，其余直接跳过 --- */
+function updateSurvival(dt, input) {
+  const p = player;
+  p.hurtFlash = Math.max(0, p.hurtFlash - dt);
+  if (mode !== MODE.SURVIVAL || p.dead) return;
+
+  // 坠落伤害：记录离地后的最高点，落地时用它减去落点
+  if (p.fly || p.inWater || p.inLava) p.fallPeak = null;
+  else if (p.onGround) {
+    if (p.fallPeak !== null) {
+      const d = p.fallPeak - p.y;
+      if (d > SURV.fallSafe) hurt(Math.min(20, Math.floor(d - SURV.fallSafe) + 1));
+      p.fallPeak = null;
+    }
+  } else if (p.fallPeak === null) p.fallPeak = p.y;
+  else if (p.y > p.fallPeak) p.fallPeak = p.y;
+
+  // 溺水：只有头部没入水中才消耗氧气
+  const headId = getEffective(Math.floor(p.x), Math.floor(p.y + EYE), Math.floor(p.z));
+  if (headId === I.WATER) {
+    p.air -= dt;
+    if (p.air <= 0) {
+      p.air = 0;
+      p.drownT += dt;
+      if (p.drownT >= SURV.drownDelay) { p.drownT = 0; hurt(SURV.drownDps); }
+    }
+  } else {
+    p.air = Math.min(p.maxAir, p.air + dt * SURV.airRefill);
+    p.drownT = 0;
+  }
+
+  // 岩浆
+  if (p.inLava) {
+    p.lavaT += dt;
+    if (p.lavaT >= SURV.lavaTick) {
+      p.lavaT = 0;
+      // lavaDps 是「每秒」伤害，这里按 tick 周期折算 —— 直接拿它当每次伤害的话
+      // 实际是 4 / 0.5s = 8 点/秒，满血 2.5 秒烧死，根本来不及游出来
+      hurt(SURV.lavaDps * SURV.lavaTick);
+    }
+  } else p.lavaT = 0;
+
+  // 接触伤害方块（仙人掌；以后加别的只需给它标 hurt）
+  const hx0 = Math.floor(p.x - PW), hx1 = Math.floor(p.x + PW - 1e-6);
+  const hy0 = Math.floor(p.y),      hy1 = Math.floor(p.y + 1.8 - 1e-6);
+  const hz0 = Math.floor(p.z - PW), hz1 = Math.floor(p.z + PW - 1e-6);
+  let touched = 0;
+  for (let y = hy0; y <= hy1 && !touched; y++)
+    for (let z = hz0; z <= hz1 && !touched; z++)
+      for (let x = hx0; x <= hx1; x++) {
+        const B = BLOCKS[getEffective(x, y, z)];
+        if (B && B.hurt) { touched = B.hurt; break; }
+      }
+  if (touched) {
+    p.cactusT += dt;
+    if (p.cactusT >= SURV.cactusTick) { p.cactusT = 0; hurt(touched); }
+  } else p.cactusT = 0;
+
+  // 饥饿：静止也会慢慢消耗，跑动快得多
+  const moving = !!(input.f || input.b || input.l || input.r);
+  if (!p.fly) {
+    p.exhaust += dt * (input.sprint && moving ? SURV.exhaustRun : moving ? SURV.exhaustWalk : SURV.exhaustIdle);
+    while (p.exhaust >= SURV.exhaustPerFood) {
+      p.exhaust -= SURV.exhaustPerFood;
+      p.food = Math.max(0, p.food - 1);
+    }
+  }
+
+  // 吃饱了慢慢回血（会额外消耗饥饿，形成「吃 → 回血 → 更饿」的循环）
+  if (p.food >= SURV.regenFood && p.hp < p.maxHp) {
+    p.regenT += dt;
+    if (p.regenT >= SURV.regenInterval) {
+      p.regenT = 0;
+      heal(1);
+      p.exhaust += SURV.regenCost;
+    }
+  } else p.regenT = 0;
+
+  // 饿死
+  if (p.food <= 0) {
+    p.starveT += dt;
+    if (p.starveT >= SURV.starveInterval) { p.starveT = 0; hurt(1); }
+  } else p.starveT = 0;
+}
+
+/* --- 按硬度计时的挖掘 ---
+ * 创造模式是瞬破（沿用 doBreak），生存模式要按住左键挖满时长。 */
+const dig = { on: false, x: 0, y: 0, z: 0, t: 0 };
+/* 返回 0~1 的进度，供准星进度环使用 */
+function digProgress() {
+  if (!dig.on) return 0;
+  const bt = breakTime(getEffective(dig.x, dig.y, dig.z));
+  if (!Number.isFinite(bt) || bt <= 0) return 0;
+  return clamp(dig.t / bt, 0, 1);
+}
+function cancelDig() { dig.on = false; dig.t = 0; }
+
+/* 推进挖掘进度。hit 为当前准星目标；返回「本帧挖穿的方块」或 null。 */
+function updateDig(dt, hit) {
+  if (mode !== MODE.SURVIVAL) { cancelDig(); return null; }
+  if (!hit) { cancelDig(); return null; }
+  const bt = breakTime(hit.id);
+  if (!Number.isFinite(bt) || bt <= 0) { cancelDig(); return null; }   // 液体：挖不动
+  if (!dig.on || dig.x !== hit.x || dig.y !== hit.y || dig.z !== hit.z) {
+    dig.on = true; dig.x = hit.x; dig.y = hit.y; dig.z = hit.z; dig.t = 0;
+  }
+  dig.t += dt;
+  if (dig.t < bt) return null;
+  cancelDig();
+  return hit;
 }
 
 /* ============================== 音效 ============================== */
@@ -985,14 +1570,23 @@ window.addEventListener('keydown', (e) => {
   if (k === 'ControlLeft') input.sprint = true;
 
   if (k === 'KeyF') {
-    player.fly = !player.fly;
-    player.vy = 0;
-    document.getElementById('flyTag').textContent = player.fly ? '(开)' : '(关)';
-    blip(player.fly ? 880 : 440, 0.09, 'sine', 0.06);
+    if (mode === MODE.SURVIVAL) { toast('生存模式没有飞行 —— 想飞请按 G 切回创造'); }
+    else {
+      player.fly = !player.fly;
+      player.vy = 0;
+      $('flyTag').textContent = player.fly ? '(开)' : '(关)';
+      blip(player.fly ? 880 : 440, 0.09, 'sine', 0.06);
+    }
   }
-  if (k === 'KeyR') { player.x = player.spawn[0]; player.y = player.spawn[1]; player.z = player.spawn[2]; player.vx = player.vy = player.vz = 0; blip(660, .12, 'sine', .06); }
+  if (k === 'KeyG') setMode(mode === MODE.SURVIVAL ? MODE.CREATIVE : MODE.SURVIVAL);
+  if (k === 'KeyE' && running) { e.preventDefault(); toggleBag(); }
+  if (k === 'KeyR') {
+    if (mode === MODE.SURVIVAL) { respawn(); toast('已回到出生点'); }
+    else { player.x = player.spawn[0]; player.y = player.spawn[1]; player.z = player.spawn[2]; player.vx = player.vy = player.vz = 0; }
+    blip(660, .12, 'sine', .06);
+  }
   if (k >= 'Digit1' && k <= 'Digit9') selectSlot(+k.slice(5) - 1);
-  if (k === 'Escape') { /* 由 pointerlockchange 处理 */ }
+  if (k === 'Escape') { if (bagOpen) closeBag(); /* 其余交给 pointerlockchange */ }
 });
 window.addEventListener('keyup', (e) => {
   const k = e.code;
@@ -1052,14 +1646,17 @@ canvas.addEventListener('contextmenu', (e) => {
 
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
-  selectSlot((selected + (e.deltaY > 0 ? 1 : -1) + HOTBAR.length) % HOTBAR.length);
+  const n = activeSlots().length;
+  selectSlot((selected + (e.deltaY > 0 ? 1 : -1) + n) % n);
 }, { passive: false });
 
-/* 鼠标按键：左挖右放，长按连续动作 */
+/* 鼠标按键：左挖右放，长按连续动作。
+ * 注意生存模式不能在这里直接挖 —— 必须走 updateDig 的计时流程，
+ * 否则按住左键会绕过硬度、瞬间破块。 */
 canvas.addEventListener('mousedown', (e) => {
   if (!running) return;
-  if (e.button === 0) { breakHeld = true; doBreak(); }
-  if (e.button === 2) { placeHeld = true; doPlace(); }
+  if (e.button === 0) { breakHeld = true; if (mode !== MODE.SURVIVAL) doBreak(); }
+  if (e.button === 2) { placeHeld = true; doPlace(); lastAction = performance.now() / 1000; }
 });
 window.addEventListener('mouseup', (e) => {
   if (e.button === 0) breakHeld = false;
@@ -1114,45 +1711,80 @@ if ('ontouchstart' in window && matchMedia('(pointer:coarse)').matches) {
     player.fly = !player.fly; player.vy = 0;
     document.getElementById('flyTag').textContent = player.fly ? '(开)' : '(关)';
   });
-  // 触屏：轻点屏幕 = 挖掘，长按 = 放置
+  // 触屏：按住 = 挖掘（生存模式按进度累计），长按 380ms = 放置
   let tapT = 0, tapTimer = null;
   canvas.addEventListener('touchstart', (e) => {
     tapT = performance.now();
-    tapTimer = setTimeout(() => { placeHeld = true; doPlace(); }, 380);
+    breakHeld = true;                      // 按住期间持续挖，松手即停
+    lastAction = performance.now() / 1000;
+    if (mode !== MODE.SURVIVAL) doBreak(); // 创造模式瞬破，立即给反馈
+    tapTimer = setTimeout(() => {
+      breakHeld = false;                   // 转入放置，不再挖
+      placeHeld = true; doPlace();
+      lastAction = performance.now() / 1000;
+    }, 380);
   }, { passive: true });
   canvas.addEventListener('touchend', () => {
     clearTimeout(tapTimer);
-    if (performance.now() - tapT < 380) { doBreak(); }
-    breakHeld = false; placeHeld = false;
+    breakHeld = false; placeHeld = false; cancelDig();
   });
 }
 
 /* ============================== 操作 ============================== */
 let targetBlock = null;     // 当前指向的方块（用于渲染高亮）
 
+/* 基岩（世界底层的黑曜石）不可破坏 */
+const isBedrock = (hit) => hit.id === I.OBSIDIAN && hit.y === 0;
+
+/* 破坏一个方块的共同收尾：清空、音效、粒子。生存模式再补上掉落进背包。 */
+function breakBlock(hit, withDrop) {
+  const id = hit.id;
+  const B = BLOCKS[id];
+  setBlock(hit.x, hit.y, hit.z, 0);
+  noiseBurst(0.10, 0.09, id === I.SAND ? 2600 : id === I.GLASS ? 5200 : 1100);
+  blip(120 + id * 14, 0.05, 'triangle', 0.035);
+  spawnParticles(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, B.side);
+  if (withDrop) collectDrop(id);
+  return id;
+}
+
+/* 创造模式：一指破 */
 function doBreak() {
   if (!running) return;
   const hit = raycast(REACH);
   if (!hit) return;
-  if (hit.id === 13 && hit.y === 0) { blip(160, .1, 'sawtooth', .05); return; }  // 基岩不可破坏
-  const id = hit.id;
-  setBlock(hit.x, hit.y, hit.z, 0);
-  noiseBurst(0.10, 0.09, id === 5 ? 2600 : id === 10 ? 5200 : 1100);
-  blip(120 + id * 14, 0.05, 'triangle', 0.035);
-  // 掉落的碎石粒子
-  spawnParticles(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5, BLOCKS[id].side);
+  if (isBedrock(hit)) { blip(160, .1, 'sawtooth', .05); return; }
+  breakBlock(hit, false);
+}
+
+/* 生存模式：按硬度挖满时长后才破（由主循环里的 updateDig 调用） */
+function doBreakTimed(hit) {
+  if (!running || !hit) return;
+  if (isBedrock(hit)) { blip(160, .1, 'sawtooth', .05); return; }
+  breakBlock(hit, true);
 }
 
 function doPlace() {
   if (!running) return;
+  const id = heldId();
+  if (!id) return;
+
+  // 食物：右键是「吃」而不是「放」
+  if (ITEMS[id]) {
+    if (tryEat(id)) { noiseBurst(0.09, 0.05, 700); blip(520, 0.10, 'sine', 0.05); }
+    invDirty = true;
+    return;
+  }
+
   const hit = raycast(REACH);
   if (!hit) return;
   const x = hit.x + hit.nx, y = hit.y + hit.ny, z = hit.z + hit.nz;
   if (y < 0 || y >= H) return;                  // 只限制垂直范围，水平方向无限
-  if (getEffective(x, y, z) !== 0 && getEffective(x, y, z) !== 11) return;
+  const cur = getEffective(x, y, z);
+  if (cur !== 0 && !isLiquid(cur)) return;      // 只能放进空气或替换液体
   // 不能把方块塞进自己身体里
-  const id = HOTBAR[selected];
   if (isSolid(id) && insideSelf(x, y, z)) return;
+  if (mode === MODE.SURVIVAL && !invTake(id, 1)) return;   // 生存模式：有货才放得下
   setBlock(x, y, z, id);
   noiseBurst(0.06, 0.07, 900);
   blip(300 + id * 10, 0.05, 'sine', 0.04);
@@ -1183,27 +1815,158 @@ function updateParticles(dt) {
   }
 }
 
-/* 物品栏 UI */
+/* ============================== 界面：物品栏 / 状态 / 背包 ============================== */
+const $ = (id) => document.getElementById(id);
+
+/* 物品栏：9 格。创造模式显示固定调色板，生存模式显示自己的快捷栏，
+ * 并在右下角标出剩余数量（空手时整格变暗）。 */
 function buildHotbar() {
-  const bar = document.getElementById('hotbar');
+  const bar = $('hotbar');
   bar.innerHTML = '';
-  HOTBAR.forEach((id, i) => {
-    const B = BLOCKS[id];
+  const slots = activeSlots();
+  for (let i = 0; i < slots.length; i++) {
+    const id = slots[i] | 0;
     const el = document.createElement('div');
-    el.className = 'slot' + (i === selected ? ' on' : '');
-    el.title = B.name;
-    const c = `rgb(${B.side[0]},${B.side[1]},${B.side[2]})`;
+    el.className = 'slot' + (i === selected ? ' on' : '') + (id ? '' : ' void');
+    el.title = id ? defName(id) : '空格子';
+    const c = defColor(id);
     el.innerHTML = `<span class="key">${i + 1}</span>
-      <span class="sw" style="background:${c}"></span>
-      <span class="nm">${B.n}</span>`;
+      <span class="sw" style="background:rgb(${c[0]},${c[1]},${c[2]})"></span>
+      <span class="nm">${id ? defShort(id) : ''}</span>
+      <span class="cnt" data-i="${i}"></span>`;
     el.addEventListener('click', () => selectSlot(i));
     bar.appendChild(el);
+  }
+  refreshHotbar();
+}
+/* 只更新数量角标，避免每帧重建 DOM */
+function refreshHotbar() {
+  const surv = mode === MODE.SURVIVAL;
+  document.querySelectorAll('#hotbar .slot').forEach((el, i) => {
+    const cnt = el.querySelector('.cnt');
+    if (!cnt) return;
+    const id = activeSlots()[i] | 0;
+    cnt.textContent = surv && id ? String(invCount(id)) : '';
+    el.classList.toggle('void', !id);
   });
 }
 function selectSlot(i) {
-  selected = clamp(i, 0, HOTBAR.length - 1);
-  [...document.querySelectorAll('.slot')].forEach((el, k) => el.classList.toggle('on', k === selected));
+  const n = activeSlots().length;
+  selected = clamp(i, 0, n - 1);
+  document.querySelectorAll('#hotbar .slot').forEach((el, k) => el.classList.toggle('on', k === selected));
   blip(520 + selected * 40, 0.04, 'sine', 0.03);
+}
+
+/* ---------------- 生命 / 饥饿 / 氧气 ---------------- */
+const ICON = (id, cls) => `<svg class="${cls}" viewBox="0 0 20 20"><use href="#${id}"/></svg>`;
+
+function renderVitals() {
+  const p = player;
+  // 生命：10 颗心，每颗代表 2 点
+  let hearts = '';
+  for (let i = 0; i < p.maxHp / 2; i++) {
+    const v = p.hp - i * 2;
+    hearts += ICON('icHeart', v >= 2 ? 'full' : v >= 1 ? 'half' : '');
+  }
+  $('hearts').innerHTML = hearts;
+  // 饥饿：10 个鸡腿
+  let food = '';
+  for (let i = 0; i < p.maxFood / 2; i++) {
+    const v = p.food - i * 2;
+    food += ICON('icMeat', v >= 2 ? 'full' : v >= 1 ? 'half' : '');
+  }
+  $('foodRow').innerHTML = food;
+  // 氧气：只有真的在水下才显示
+  const under = p.air < p.maxAir - 0.01;
+  $('airRow').style.visibility = under ? 'visible' : 'hidden';
+  if (under) {
+    let air = '';
+    for (let i = 0; i < p.maxAir; i++) air += ICON('icBub', 'bub' + (i < Math.ceil(p.air) ? '' : ' off'));
+    $('airRow').innerHTML = air;
+  }
+}
+
+/* ---------------- 方块库 / 背包 ---------------- */
+const allPlaceableIds = () => BLOCKS.map((b, i) => (b ? i : 0)).filter((i) => i > 0);
+
+function renderBag() {
+  const surv = mode === MODE.SURVIVAL;
+  $('bagTitle').textContent = surv ? '背包' : '方块库';
+  $('bagSub').textContent = surv
+    ? '点击放入选中的格子 —— 生存模式用掉的方块要自己去挖'
+    : '点击任意方块放入当前选中的格子（共 ' + allPlaceableIds().length + ' 种）';
+  const grid = $('bagGrid');
+  const ids = surv
+    ? [...inv.keys()].filter((id) => invCount(id) > 0).sort((a, b) => a - b)
+    : allPlaceableIds();
+
+  if (!ids.length) {
+    grid.innerHTML = '<div class="bagempty">背包是空的 —— 去挖点东西吧 ⛏️</div>';
+    return;
+  }
+
+  grid.innerHTML = '';
+  const cur = heldId();
+  for (const id of ids) {
+    const c = defColor(id);
+    const el = document.createElement('div');
+    el.className = 'bg-item' + (id === cur ? ' sel' : '');
+    el.title = defName(id) + (ITEMS[id] && ITEMS[id].food ? `（食物，右键吃，+${ITEMS[id].food} 饥饿）` : '');
+    const cnt = surv ? `<span class="num">×${invCount(id)}</span>` : '';
+    el.innerHTML = `<span class="sw" style="background:rgb(${c[0]},${c[1]},${c[2]})"></span>
+      <span>${defShort(id)}</span>${cnt}`;
+    el.addEventListener('click', () => {
+      // 把这个物品放到当前选中的格子
+      if (surv) {
+        const from = invSlots.indexOf(id);
+        if (from === selected) { return; }
+        if (from >= 0) invSlots[from] = 0;      // 已经在别的格子 → 挪过来
+        invSlots[selected] = id;
+      } else {
+        HOTBAR[selected] = id;
+      }
+      invDirty = true;
+      renderBag();
+      buildHotbar();
+    });
+    grid.appendChild(el);
+  }
+}
+
+/* ---------------- 提示 / 受伤 / 死亡 ---------------- */
+let toastTimer = null;
+function toast(msg, ms = 1800) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+function syncHurt() {
+  $('hurt').classList.toggle('on', player.hurtFlash > 0);
+}
+
+/* 模式切换：创造 ↔ 生存 */
+function setMode(m, announce = true) {
+  mode = m;
+  const surv = m === MODE.SURVIVAL;
+  document.body.classList.toggle('survival', surv);
+  if (surv) {
+    player.fly = false;                       // 生存模式没有飞行
+    player.hp = player.maxHp;
+    player.food = player.maxFood;
+    player.air = player.maxAir;
+    player.dead = false;
+    player.fallPeak = null;
+    player.exhaust = 0;
+    cancelDig();
+  }
+  $('flyTag').textContent = player.fly ? '(开)' : '(关)';
+  invDirty = true;
+  buildHotbar();
+  renderVitals();
+  if (announce) toast(surv ? '⚔️ 生存模式：会饿、会摔伤、挖矿要花时间' : '🌿 创造模式：无限方块、可飞行');
 }
 
 /* ============================== 主循环 ============================== */
@@ -1270,12 +2033,23 @@ function frame(now) {
 
   if (running && !paused) {
     updatePhysics(dt, input);
+    updateSurvival(dt, input);
     updateParticles(dt);
-    // 长按连续挖掘 / 放置（每 0.18s 一次）
-    if (breakHeld && t - lastAction > 0.18) { doBreak(); lastAction = t; }
+    if (invDirty) { invDirty = false; refreshHotbar(); }
+    // 先取一次准星目标，挖掘进度与后面的高亮框共用同一份结果
+    targetBlock = raycast(REACH);
+    // 挖掘：创造模式瞬破（长按每 0.18s 一次），生存模式按硬度累计进度
+    if (mode === MODE.SURVIVAL) {
+      if (breakHeld) {
+        const broke = updateDig(dt, targetBlock);
+        if (broke) doBreakTimed(broke);
+      } else cancelDig();
+    } else if (breakHeld && t - lastAction > 0.18) { doBreak(); lastAction = t; }
     if (placeHeld && t - lastAction > 0.22) { doPlace(); lastAction = t; }
+  } else {
+    cancelDig();
+    targetBlock = running ? raycast(REACH) : null;
   }
-  targetBlock = running ? raycast(REACH) : null;
 
   // ---------------- 渲染 ----------------
   const aspect = canvas.width / Math.max(1, canvas.height);
@@ -1336,10 +2110,11 @@ function frame(now) {
 
   if (targetBlock) {
     const t = targetBlock;
-    // 先在稍大的尺寸画一圈暗色描边，再画白框，让高亮在任何背景上都清晰
+    // 生存模式挖到一半时，把框染成琥珀色，进度越深越亮 —— 明确「在挖、但还没破」
+    const dp = mode === MODE.SURVIVAL ? digProgress() : 0;
     gl.uniform4f(locLine.uColor, 0.03, 0.03, 0.04, 0.75);
     drawLineBox(t.x + 0.5, t.y + 0.5, t.z + 0.5, 1.008);
-    gl.uniform4f(locLine.uColor, 1, 1, 1, 0.9);
+    gl.uniform4f(locLine.uColor, 1, 0.55 + 0.45 * (1 - dp), 0.25 + 0.75 * (1 - dp), 0.9);
     drawLineBox(t.x + 0.5, t.y + 0.5, t.z + 0.5, 1.0);
   }
 
@@ -1352,16 +2127,29 @@ function frame(now) {
   }
   gl.enable(gl.CULL_FACE);
 
-  // 4) 准星命中反馈 + HUD
-  const cross = document.getElementById('cross');
+  // 4) 准星命中反馈 + 挖掘进度环 + HUD
+  const cross = $('cross');
   cross.classList.toggle('hit', !!targetBlock);
+  const dp = mode === MODE.SURVIVAL ? digProgress() : 0;
+  $('digring').classList.toggle('on', dp > 0);
+  if (dp > 0) $('digring').style.setProperty('--p', (dp * 100).toFixed(1));
+
+  // 生存数值每帧都便宜（只有十几个 SVG），但没必要 —— 每 6 帧刷一次足够跟手
+  if (frames % 6 === 0) {
+    if (mode === MODE.SURVIVAL) renderVitals();
+    syncHurt();
+  }
+
   fpsAcc += dt; fpsN++;
   if (fpsAcc > 0.5) { fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
   if (frames % 12 === 0) {
-    document.getElementById('stat').textContent =
-      `${fps} FPS · 区块 ${drawn}/${chunks.length} · 三角面 ${(tris / 1000).toFixed(1)}k · ` +
-      `坐标 ${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}` +
-      (player.inWater ? ' · 水中' : '') + (player.fly ? ' · 飞行' : '');
+    const bits = [`${fps} FPS`, `区块 ${drawn}/${chunks.length}`, `三角面 ${(tris / 1000).toFixed(1)}k`,
+      `坐标 ${player.x.toFixed(1)}, ${player.y.toFixed(1)}, ${player.z.toFixed(1)}`];
+    if (mode === MODE.SURVIVAL) bits.push(`❤ ${player.hp}/${player.maxHp}`, `🍖 ${player.food}/${player.maxFood}`);
+    if (player.inLava) bits.push('岩浆中');
+    else if (player.inWater) bits.push('水中');
+    if (player.fly) bits.push('飞行');
+    $('stat').textContent = bits.join(' · ');
   }
 }
 
@@ -1391,9 +2179,11 @@ function drawLineBox(cx, cy, cz, size) {
 /* ============================== 启动流程 ============================== */
 function startGame(wantLock = true) {
   audio();
+  if (bagOpen) closeBag(true);
   running = true;
   paused = false;
-  document.getElementById('veil').classList.add('hide');
+  $('veil').classList.add('hide');
+  $('death').classList.remove('show');
   if (wantLock && canvas.requestPointerLock) canvas.requestPointerLock();
 }
 function pauseGame() {
@@ -1401,18 +2191,73 @@ function pauseGame() {
   paused = true;
   Object.keys(input).forEach((k) => (input[k] = false));
   breakHeld = placeHeld = false;
-  document.getElementById('veil').classList.remove('hide');
-  document.getElementById('veilHint').innerHTML =
+  cancelDig();
+  if (bagOpen) return;                       // 背包面板自己就是「暂停界面」，别叠加遮罩
+  $('veil').classList.remove('hide');
+  $('veilHint').innerHTML =
     '已暂停 — 点击继续，或按 <b>Esc</b> 关闭鼠标锁定';
 }
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement === canvas) {
-    document.getElementById('veil').classList.add('hide');
+    if (bagOpen) return;
+    $('veil').classList.add('hide');
     running = true; paused = false;
   } else if (running) {
     pauseGame();
   }
 });
+/* 关掉背包会立刻重新请求指针锁定，而浏览器对「刚解锁就重锁」有冷却，
+ * 被拒后就没人管了 —— 鼠标锁不上、又没有遮罩，玩家会以为游戏卡住。
+ * 这里退化成暂停遮罩，点一下即可继续。 */
+document.addEventListener('pointerlockerror', () => {
+  if (!bagOpen) pauseGame();
+});
+
+/* ---------------- 方块库 / 背包面板 ----------------
+ * 面板需要真实鼠标指针，所以打开时必须退出指针锁定；关闭时再请求锁回来。
+ * 浏览器对「刚退出锁定就立刻重新锁定」有冷却，若被拒绝，
+ * 就退化成显示暂停遮罩 —— 点一下即可继续，不会卡死。 */
+let bagOpen = false;
+function openBag() {
+  bagOpen = true;
+  renderBag();
+  $('bag').classList.add('show');
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+  else pauseGame();                          // 触屏等没有指针锁定的环境，手动暂停
+  blip(600, 0.06, 'sine', 0.05);
+}
+function closeBag(silent) {
+  bagOpen = false;
+  $('bag').classList.remove('show');
+  if (document.body.classList.contains('touch')) { startGame(false); return; }
+  if (canvas.requestPointerLock) canvas.requestPointerLock();
+  if (!silent) blip(440, 0.06, 'sine', 0.05);
+}
+function toggleBag() { bagOpen ? closeBag() : openBag(); }
+$('bag').addEventListener('click', (e) => { if (e.target.id === 'bag') closeBag(); });
+
+/* ---------------- 死亡与重生 ---------------- */
+function showDeath(reason) {
+  $('deathMsg').textContent = reason;
+  $('death').classList.add('show');
+}
+$('btnRespawn').addEventListener('click', () => {
+  respawn();
+  $('death').classList.remove('show');
+  startGame(true);
+});
+
+/* 把生存逻辑的事件钩子接到界面上（生存逻辑本身不知道 DOM 的存在） */
+onHurt = () => { syncHurt(); blip(150, 0.14, 'sawtooth', 0.055); };
+onDeath = () => {
+  running = false; paused = true;
+  breakHeld = placeHeld = false;
+  cancelDig();
+  Object.keys(input).forEach((k) => (input[k] = false));
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+  showDeath(player.inLava ? '你被岩浆吞没了' : '生命值归零');
+};
+
 document.getElementById('btnStart').addEventListener('click', () => startGame(true));
 document.getElementById('veil').addEventListener('click', (e) => {
   if (e.target.id === 'veil' || e.target.classList.contains('panel') || e.target.id === 'veilHint') {
@@ -1421,6 +2266,16 @@ document.getElementById('veil').addEventListener('click', (e) => {
     else canvas.requestPointerLock ? startGame(true) : startGame(false);
   }
 });
+
+/* ------------------------------ 模式选择器 ------------------------------ */
+/* 开始面板上选模式。默认创造；选了生存就切过去。 */
+const modeBtns = [...document.querySelectorAll('.mode')];
+function pickMode(m) {
+  for (const b of modeBtns) b.classList.toggle('on', +b.dataset.mode === m);
+  setMode(m, false);
+}
+modeBtns.forEach((b) => b.addEventListener('click', () => pickMode(+b.dataset.mode)));
+pickMode(MODE.CREATIVE);
 
 /* ------------------------------ 初始化世界 ------------------------------ */
 (function boot() {
@@ -1436,12 +2291,15 @@ document.getElementById('veil').addEventListener('click', (e) => {
   // 区块窗口以玩家所在区块为中心，之后随玩家移动自动平移
   initChunks(Math.floor(player.x / CW), Math.floor(player.z / CD));
   buildHotbar();
+  renderVitals();
   resize();
 
   // 逐帧预构建全部区块，构建期间显示进度
   let done = 0;
   const total = chunks.length;
   const veil = document.getElementById('veilHint');
+  const ready = `地形就绪（${info.trees} 棵树 · ${info.cacti} 丛仙人掌 · ` +
+    `${info.oreCount} 块矿石 · 底部 ${info.lavaCount} 格岩浆）`;
   function step() {
     const budgetStart = performance.now();
     while (done < total && performance.now() - budgetStart < 14) {
@@ -1452,7 +2310,7 @@ document.getElementById('veil').addEventListener('click', (e) => {
       veil.textContent = `正在生成地形… ${Math.round(done / total * 100)}%`;
       requestAnimationFrame(step);
     } else {
-      veil.innerHTML = `地形就绪（${info.trees} 棵树）· 点击后会锁定鼠标，按 <b>Esc</b> 可随时退出`;
+      veil.innerHTML = `${ready} · 点击后会锁定鼠标，按 <b>Esc</b> 可随时退出`;
       document.getElementById('btnStart').textContent = '开始游戏';
     }
   }
