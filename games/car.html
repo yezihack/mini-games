@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>环轨竞速：重力反转赛车</title>
+    <meta name="description" content="在环形磁轨上飙车的竞速小游戏：↑↓ 加速减速，空格一键反转重力躲开障碍，与 AI 对手抢位冲线。">
+    <meta name="wb-category" content="游戏">
+    <meta name="wb-icon" content="🏎️">
+    <meta name="wb-tags" content="竞速,赛车,重力反转,键盘,跑酷">
+    <meta name="wb-order" content="30">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0a1a'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle'%3E%F0%9F%8F%8E%EF%B8%8F%3C/text%3E%3C/svg%3E">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        body {
+            background: #0a0a1a;
+        }
+        canvas {
+            display: block;
+        }
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-family: sans-serif;
+            font-size: 14px;
+            text-align: center;
+            opacity: 0.8;
+            text-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div class="instructions">
+    ↑↓键加速/减速 | 空格键反转重力
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+// 适配分辨率
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// 贝塞尔曲线赛道生成
+const bezierPoints = [
+    {x: W*0.5, y: H*0.15},
+    {x: W*0.8, y: H*0.1},
+    {x: W*0.9, y: H*0.5},
+    {x: W*0.8, y: H*0.85},
+    {x: W*0.5, y: H*0.9},
+    {x: W*0.2, y: H*0.85},
+    {x: W*0.1, y: H*0.5},
+    {x: W*0.2, y: H*0.1},
+];
+
+// 三次贝塞尔采样函数
+function cubicBezier(p0, p1, p2, p3, t) {
+    const t2 = t*t;
+    const t3 = t2*t;
+    const mt = 1-t;
+    const mt2 = mt*mt;
+    const mt3 = mt2*mt;
+    return {
+        x: mt3*p0.x + 3*mt2*t*p1.x + 3*mt*t2*p2.x + t3*p3.x,
+        y: mt3*p0.y + 3*mt2*t*p1.y + 3*mt*t2*p2.y + t3*p3.y
+    };
+}
+
+// 生成赛道采样点（1000个点保证平滑）
+const SAMPLE_COUNT = 1000;
+const trackSamples = [];
+const TRACK_WIDTH = 35; // 管道宽度
+
+for(let i=0; i<SAMPLE_COUNT; i++) {
+    const t = i/SAMPLE_COUNT;
+    const group = Math.floor(t*bezierPoints.length);
+    const p0 = bezierPoints[group % bezierPoints.length];
+    const p1 = bezierPoints[(group+1) % bezierPoints.length];
+    const p2 = bezierPoints[(group+2) % bezierPoints.length];
+    const p3 = bezierPoints[(group+3) % bezierPoints.length];
+    
+    const point = cubicBezier(p0, p1, p2, p3, (t*bezierPoints.length) % 1);
+    // 计算切线角度
+    const prev = i === 0 ? point : trackSamples[i-1].point;
+    const tangentAngle = Math.atan2(point.y - prev.y, point.x - prev.x);
+    // 法线方向（重力方向的两个可选方向）
+    const normalAngle = tangentAngle + Math.PI/2;
+    
+    trackSamples.push({
+        point,
+        tangentAngle,
+        normalAngle,
+        left: {
+            x: point.x + Math.cos(normalAngle)*TRACK_WIDTH,
+            y: point.y + Math.sin(normalAngle)*TRACK_WIDTH
+        },
+        right: {
+            x: point.x - Math.cos(normalAngle)*TRACK_WIDTH,
+            y: point.y - Math.sin(normalAngle)*TRACK_WIDTH
+        }
+    });
+}
+
+// 生成检查点（4个按顺序触发完成一圈）
+const checkpoints = [
+    {index: 0, passed: false},
+    {index: Math.floor(SAMPLE_COUNT*0.25), passed: false},
+    {index: Math.floor(SAMPLE_COUNT*0.5), passed: false},
+    {index: Math.floor(SAMPLE_COUNT*0.75), passed: false}
+];
+
+// 障碍物生成
+const obstacles = [];
+const OBSTACLE_COUNT = 8;
+for(let i=0; i<OBSTACLE_COUNT; i++) {
+    const sampleIdx = Math.floor(SAMPLE_COUNT * (i/OBSTACLE_COUNT + 0.05));
+    obstacles.push({
+        sampleIndex: sampleIdx,
+        x: trackSamples[sampleIdx].point.x,
+        y: trackSamples[sampleIdx].point.y,
+        radius: 15
+    });
+}
+
+// 粒子系统
+let particles = [];
+
+class Particle {
+    constructor(x, y, isBoost = false) {
+        this.x = x + (Math.random()-0.5)*10;
+        this.y = y + (Math.random()-0.5)*10;
+        this.vx = (Math.random()-0.5)*3;
+        this.vy = (Math.random()-0.5)*3;
+        this.life = 1;
+        this.decay = 0.02 + Math.random()*0.03;
+        this.size = isBoost ? 3+Math.random()*3 : 2+Math.random()*2;
+        this.color = isBoost ? 
+            `hsl(${Math.random()*60 + 10}, 100%, 60%)` : // 加速粒子是火焰色
+            `hsl(0, 0%, ${50 + Math.random()*30}%)`; // 尾气是灰色
+    }
+    
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+        this.size *= 0.95;
+        return this.life > 0;
+    }
+}
+
+// 车辆类
+class Car {
+    constructor(x, y, color, isPlayer = false) {
+        this.x = x;
+        this.y = y;
+        this.angle = 0;
+        this.speed = 0;
+        this.maxSpeed = isPlayer ? 8 : 6;
+        this.acceleration = 0.1;
+        this.friction = 0.99;
+        this.color = color;
+        this.isPlayer = isPlayer;
+        this.gravityDir = 0; // 0是向下法线，1是向上法线表示重力反转
+        this.sampleIndex = 0;
+        this.lap = 1;
+        this.lapTimes = [];
+        this.currentLapStart = Date.now();
+        this.gravityCooldown = 0;
+        this.offset = 0; // 相对于赛道中心线的偏移，根据重力方向正负
+    }
+    
+    update(keys) {
+        // 重力反转冷却
+        if(this.gravityCooldown > 0) this.gravityCooldown--;
+        
+        // 玩家控制
+        if(this.isPlayer) {
+            if(keys.up) this.speed += this.acceleration;
+            if(keys.down) this.speed -= this.acceleration*0.8;
+            if(keys.space && this.gravityCooldown <= 0) {
+                this.gravityDir = 1 - this.gravityDir;
+                this.gravityCooldown = 15; // 0.25秒冷却大约15帧
+            }
+        } else {
+            // AI逻辑：匀速，遇到障碍物大概率反转重力躲避
+            this.speed = this.maxSpeed * 0.85 + Math.sin(Date.now()/1000 + this.sampleIndex/100)*0.5;
+            const nextObstacle = obstacles.find(o => 
+                Math.abs(o.sampleIndex - this.sampleIndex) < 15
+            );
+            if(nextObstacle && Math.random() < 0.01) {
+                this.gravityDir = 1 - this.gravityDir;
+            }
+        }
+        
+        // 速度限制
+        if(this.speed > this.maxSpeed) this.speed = this.maxSpeed;
+        if(this.speed < 0) this.speed = 0;
+        this.speed *= this.friction;
+        
+        // 沿着赛道移动
+        this.sampleIndex = (this.sampleIndex + this.speed/2) % SAMPLE_COUNT;
+        if(this.sampleIndex < 0) this.sampleIndex += SAMPLE_COUNT;
+        
+        // 获取当前赛道信息
+        const sample = trackSamples[Math.floor(this.sampleIndex)];
+        // 根据重力计算偏移位置
+        const normalAngle = sample.normalAngle + (this.gravityDir === 0 ? 0 : Math.PI);
+        this.offset = Math.cos(normalAngle) * TRACK_WIDTH/2;
+        this.offsetY = Math.sin(normalAngle) * TRACK_WIDTH/2;
+        this.x = sample.point.x + this.offset;
+        this.y = sample.point.y + this.offsetY;
+        this.angle = sample.tangentAngle + (this.gravityDir === 0 ? 0 : Math.PI);
+        
+        // 检测障碍物碰撞
+        for(let obs of obstacles) {
+            const dx = obs.x - this.x;
+            const dy = obs.y - this.y;
+            if(Math.sqrt(dx*dx + dy*dy) < obs.radius + 12) {
+                this.speed *= 0.6; // 碰撞减速
+            }
+        }
+        
+        // 检测检查点
+        for(let i=0; i<checkpoints.length; i++) {
+            const cp = checkpoints[i];
+            if(!cp.passed && Math.abs(this.sampleIndex - cp.sampleIndex) < 10) {
+                cp.passed = true;
+                // 全部检查点通过，完成一圈
+                if(checkpoints.every(c => c.passed)) {
+                    const lapTime = Date.now() - this.currentLapStart;
+                    this.lapTimes.push(lapTime);
+                    this.lap++;
+                    this.currentLapStart = Date.now();
+                    // 重置检查点
+                    checkpoints.forEach(c => c.passed = false);
+                    // 存圈速
+                    if(this.isPlayer) saveLapTime(lapTime);
+                }
+                break;
+            }
+        }
+        
+        // 生成粒子
+        if(this.speed > this.maxSpeed*0.7 && Math.random() < 0.3) {
+            const backX = this.x - Math.cos(this.angle)*15;
+            const backY = this.y - Math.sin(this.angle)*15;
+            particles.push(new Particle(backX, backY, this.speed > this.maxSpeed*0.9));
+        }
+    }
+    
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.angle);
+        
+        // 画车身
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.moveTo(-18, -8);
+        ctx.lineTo(18, -6);
+        ctx.lineTo(18, 6);
+        ctx.lineTo(-18, 8);
+        ctx.closePath();
+        ctx.fill();
+        
+        // 画轮子
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-15, -9, 6, 3);
+        ctx.fillRect(-15, 6, 6, 3);
+        ctx.fillRect(10, -9, 6, 3);
+        ctx.fillRect(10, 6, 6, 3);
+        
+        // 画车灯
+        ctx.fillStyle = '#ffff00';
+        ctx.fillRect(16, -5, 3, 2);
+        ctx.fillRect(16, 3, 3, 2);
+        
+        ctx.restore();
+    }
+}
+
+// 排行榜相关
+function saveLapTime(time) {
+    const times = JSON.parse(localStorage.getItem('lapTimes') || '[]');
+    times.push({time, date: new Date().toLocaleDateString()});
+    times.sort((a,b) => a.time - b.time);
+    if(times.length > 10) times.length = 10;
+    localStorage.setItem('lapTimes', JSON.stringify(times));
+}
+
+function getBestLapTime() {
+    const times = JSON.parse(localStorage.getItem('lapTimes') || '[]');
+    return times.length > 0 ? times[0].time : Infinity;
+}
+
+function formatTime(ms) {
+    const minutes = Math.floor(ms/60000);
+    const seconds = Math.floor((ms%60000)/1000);
+    const millisesonds = ms % 1000;
+    return `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}.${millisesonds.toString().padStart(3,'0')}`;
+}
+
+// 初始化车辆
+const player = new Car(trackSamples[0].point.x, trackSamples[0].point.y, '#00ff88', true);
+const aiCars = [
+    new Car(trackSamples[0].point.x, trackSamples[0].point.y, '#ff4488'),
+    new Car(trackSamples[0].point.x, trackSamples[0].point.y, '#4488ff'),
+    new Car(trackSamples[0].point.x, trackSamples[0].point.y, '#ffd700')
+];
+// 让AI起点错开
+aiCars[0].sampleIndex = 50;
+aiCars[1].sampleIndex = 100;
+aiCars[2].sampleIndex = 150;
+
+// 输入状态
+const keys = {
+    up: false,
+    down: false,
+    space: false
+};
+
+window.addEventListener('keydown', e => {
+    if(e.key === 'ArrowUp') keys.up = true;
+    if(e.key === 'ArrowDown') keys.down = true;
+    if(e.key === ' ') keys.space = true;
+    e.preventDefault();
+});
+
+window.addEventListener('keyup', e => {
+    if(e.key === 'ArrowUp') keys.up = false;
+    if(e.key === 'ArrowDown') keys.down = false;
+    if(e.key === ' ') keys.space = false;
+    e.preventDefault();
+});
+
+// 镜头参数
+const camera = {
+    x: 0,
+    y: 0,
+    shake: 0
+};
+
+// 绘制UI（圈速、速度）
+function drawUI() {
+    ctx.save();
+    // 圈速信息
+    ctx.font = '24px monospace';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'left';
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.fillText(`第 ${player.lap} 圈`, 20, 40);
+    ctx.fillText(`当前：${formatTime(Date.now() - player.currentLapStart)}`, 20, 70);
+    ctx.fillText(`最佳：${getBestLapTime() === Infinity ? '--:--:-' : formatTime(getBestLapTime())}`, 20, 100);
+    
+    // 速度表
+    const speed = Math.abs(player.speed*10);
+    ctx.beginPath();
+    ctx.arc(100, H-100, 50, Math.PI*0.75, Math.PI*0.75 + Math.PI*1.5*(speed/(player.maxSpeed*10)));
+    ctx.strokeStyle = '#ff8800';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+    ctx.font = '20px monospace';
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.floor(speed)} km/h`, 100, H-90);
+    
+    // 排行榜
+    const times = JSON.parse(localStorage.getItem('lapTimes') || '[]');
+    if(times.length > 0) {
+        ctx.font = '18px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'white';
+        ctx.fillText('🏆 圈速排行榜 TOP5', W-20, 40);
+        times.slice(0,5).forEach((item, idx) => {
+            const text = `${idx+1}. ${formatTime(item.time)}  ${item.date}`;
+            ctx.fillStyle = idx === 0 ? '#ffd700' : `rgba(255,255,255,${0.6 - idx*0.1})`;
+            ctx.fillText(text, W-20, 70 + idx*30);
+        });
+    }
+    ctx.restore();
+}
+
+// 主循环
+function gameLoop() {
+    // 更新
+    player.update(keys);
+    aiCars.forEach(ai => ai.update());
+    particles = particles.filter(p => p.update());
+    if(particles.length > 300) particles.splice(0, particles.length - 300);
+    
+    // 镜头跟随玩家，带速度和震动效果
+    camera.x += (player.x - camera.x - W/2) * 0.1;
+    camera.y += (player.y - camera.y - H/2) * 0.1;
+    camera.shake = Math.min(player.speed * 0.2, 8);
+    const shakeX = (Math.random()-0.5) * camera.shake;
+    const shakeY = (Math.random()-0.5) * camera.shake;
+    
+    // 清空画布
+    ctx.fillStyle = '#0a0a1a';
+    ctx.fillRect(0, 0, W, H);
+    
+    ctx.save();
+    ctx.translate(-camera.x + shakeX, -camera.y + shakeY);
+    
+    // 绘制赛道
+    ctx.beginPath();
+    ctx.moveTo(trackSamples[0].left.x, trackSamples[0].left.y);
+    for(let i=1; i<SAMPLE_COUNT; i++) {
+        ctx.lineTo(trackSamples[i].left.x, trackSamples[i].left.y);
+    }
+    ctx.lineTo(trackSamples[SAMPLE_COUNT-1].right.x, trackSamples[SAMPLE_COUNT-1].right.y);
+    for(let i=SAMPLE_COUNT-1; i>=0; i--) {
+        ctx.lineTo(trackSamples[i].right.x, trackSamples[i].right.y);
+    }
+    ctx.closePath();
+    // 赛道渐变填充
+    const gradient = ctx.createLinearGradient(0,0, W, H);
+    gradient.addColorStop(0, '#1a1a3a');
+    gradient.addColorStop(0.5, '#2a2a5a');
+    gradient.addColorStop(1, '#1a1a3a');
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    
+    // 赛道边界
+    ctx.setLineDash([10, 10]);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ff8800';
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // 中心线
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.moveTo(trackSamples[0].point.x, trackSamples[0].point.y);
+    for(let i=1; i<SAMPLE_COUNT; i++) {
+        ctx.lineTo(trackSamples[i].point.x, trackSamples[i].point.y);
+    }
+    ctx.stroke();
+    
+    // 绘制障碍物
+    for(let obs of obstacles) {
+        ctx.beginPath();
+        ctx.fillStyle = '#ff3333';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = 'white';
+        ctx.fillRect(obs.x-8, obs.y-2, 16, 4);
+    }
+    
+    // 绘制粒子
+    for(let p of particles) {
+        ctx.beginPath();
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.life;
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    
+    // 绘制AI车辆
+    aiCars.forEach(ai => ai.draw());
+    // 绘制玩家
+    player.draw();
+    
+    ctx.restore();
+    
+    // 绘制UI
+    drawUI();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+// 启动游戏
+gameLoop();
+</script>
+</body>
+</html>

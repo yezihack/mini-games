@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>记忆回廊 · 叙事解谜</title>
+<meta name="description" content="WASD 探索回廊的叙事解谜：边走边收集记忆碎片，访问顺序会改写剧情，四种结局由你的路线决定。">
+<meta name="wb-category" content="游戏">
+<meta name="wb-icon" content="🕯️">
+<meta name="wb-tags" content="解谜,叙事,迷宫,探索,多结局">
+<meta name="wb-order" content="40">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23070707'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle'%3E%F0%9F%95%AF%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<style>
+:root{--bg:#070707;--panel:#111;--line:#292929;--text:#e8e8e8;--muted:#777;--hot:#d7ff3f;--danger:#ff5364}
+*{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 50% 15%,#181818 0,#070707 48%,#020202 100%);color:var(--text);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;min-height:100vh}
+.wrap{max-width:1180px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;gap:20px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:14px}
+h1{font-size:28px;letter-spacing:.18em;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:7px}.hud{display:flex;gap:18px;color:#aaa;font-size:12px}.hud b{color:var(--hot)}
+main{display:grid;grid-template-columns:minmax(480px,1fr) 330px;gap:18px;margin-top:18px}
+.card{background:linear-gradient(180deg,#111,#0b0b0b);border:1px solid var(--line);border-radius:10px;box-shadow:0 18px 60px #000;padding:14px}
+canvas{display:block;width:100%;height:auto;background:#050505;border:1px solid #242424;image-rendering:pixelated}
+.side{display:flex;flex-direction:column;gap:14px}.panel-title{font-size:11px;color:#777;letter-spacing:.18em;margin-bottom:10px}
+#story{min-height:170px;line-height:1.8;font-size:14px;white-space:pre-wrap}.cursor{display:inline-block;width:7px;height:15px;background:var(--hot);vertical-align:-2px;animation:blink .7s steps(1) infinite}@keyframes blink{50%{opacity:0}}
+.items{display:flex;flex-wrap:wrap;gap:7px}.item{border:1px solid #444;padding:6px 8px;font-size:11px;color:#aaa}.item.hot{border-color:var(--hot);color:var(--hot)}
+.log{max-height:155px;overflow:auto;font-size:11px;color:#777;line-height:1.65}.log div{border-bottom:1px solid #191919;padding:5px 0}
+.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.controls button,.actions button{background:#111;color:#ccc;border:1px solid #333;padding:9px;border-radius:6px;font:inherit;cursor:pointer}.controls button:hover,.actions button:hover{border-color:var(--hot);color:var(--hot)}
+.actions{display:flex;gap:8px}.actions button{flex:1}
+.hint{font-size:10px;color:#555;line-height:1.6}
+.rules{font-size:11px;color:#aaa;line-height:1.75}
+.rules strong{color:#ddd}.rules .accent{color:var(--hot)}
+.rule-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.rule-chip{border:1px solid #252525;padding:7px;background:#0b0b0b}
+
+#ending{display:none;position:fixed;inset:0;background:#050505ee;align-items:center;justify-content:center;padding:25px;z-index:5}.ending-box{max-width:650px;border:1px solid var(--hot);background:#090909;padding:30px;box-shadow:0 0 80px #000}.ending-box h2{color:var(--hot);letter-spacing:.2em}.ending-box p{line-height:1.9;color:#bbb}.ending-box button{background:var(--hot);border:0;padding:10px 18px;cursor:pointer;font-weight:bold}
+@media(max-width:800px){main{grid-template-columns:1fr}.hud{display:none}.wrap{padding:10px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div><h1>记忆回廊</h1><div class="sub">MEMORY CORRIDOR / A SMALL NARRATIVE PUZZLE</div></div>
+    <div class="hud"><span>房间 <b id="roomCount">0</b></span><span>时间 <b id="timer">00:00</b></span><span>状态 <b id="state">AWAKE</b></span></div>
+  </header>
+  <main>
+    <section class="card">
+      <canvas id="game" width="720" height="480"></canvas>
+      <div class="controls">
+        <button data-key="ArrowUp">↑</button><button data-key="ArrowLeft">←</button><button data-key="ArrowRight">→</button>
+        <span></span><button data-key="ArrowDown">↓</button><span></span>
+      </div>
+      <div class="hint">WASD / 方向键移动 · 黄色方块是可交互目标 · 走过的房间会改变叙事。</div>
+    </section>
+    <aside class="side">
+      <div class="card"><div class="panel-title">CURRENT MEMORY</div><div id="story">你醒来时，走廊已经在呼吸。</div><span class="cursor"></span></div>
+      <div class="card"><div class="panel-title">HOW TO PLAY · 游戏规则</div>
+        <div class="rules">
+          <strong>目标：</strong>探索回廊、收集记忆碎片，并找到出口。<br>
+          <strong>移动：</strong>使用 WASD / 方向键。灰黑色区域是墙，空白区域可以通行。<br>
+          <strong>探索：</strong>每进入一个新房间都会记录路线；<span class="accent">你的访问顺序会改变部分剧情。</span><br>
+          <strong>物品：</strong>靠近黄色方块即可自动拾取。钥匙、照片、录音带分别会改变后续记忆。<br>
+          <strong>出口：</strong>到达绿色边框的位置会触发结局判断。不同物品组合 + 探索程度对应不同结局。<br>
+          <strong>声音：</strong>第一次点击“声音”或游戏画面后，浏览器才允许播放 Web Audio。移动、拾取和文字出现时都会有声音。
+          <div class="rule-grid">
+            <div class="rule-chip">探索越深<br><span class="accent">记忆越完整</span></div>
+            <div class="rule-chip">物品组合<br><span class="accent">改变结局</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="card"><div class="panel-title">INVENTORY</div><div class="items" id="items"><span class="item">空</span></div></div>
+      <div class="card"><div class="panel-title">EVENT LOG</div><div class="log" id="log"></div></div>
+      <div class="actions"><button id="sound">声音：开</button><button id="restart">重新开始</button></div>
+    </aside>
+  </main>
+</div>
+<div id="ending"><div class="ending-box"><h2 id="endingTitle"></h2><p id="endingText"></p><button id="endingRestart">重新进入回廊</button></div></div>
+
+<script>
+(() => {
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const storyEl=document.getElementById('story'),itemsEl=document.getElementById('items'),logEl=document.getElementById('log');
+const roomCountEl=document.getElementById('roomCount'),stateEl=document.getElementById('state'),timerEl=document.getElementById('timer');
+const soundBtn=document.getElementById('sound');
+const TILE=48;
+const map=[
+"###############",
+"#S....#.......#",
+"#.###.#.#####.#",
+"#...#.#.....#.#",
+"###.#.#####.#.#",
+"#...#.....#...#",
+"#.#######.#.###",
+"#.....#...#...#",
+"#.###.#.#####.#",
+"#...#.#.....#E#",
+"###.#.#####.#.#",
+"#...#.......#.#",
+"###############"
+];
+// S start, E exit. Items and memory rooms are overlaid.
+const itemDefs={
+ key:{x:5,y:1,name:"生锈钥匙",text:"钥匙上刻着你的名字。你却不记得自己写过它。"},
+ photo:{x:11,y:3,name:"黑白照片",text:"照片里站着三个人。中间的人被撕掉了脸。"},
+ tape:{x:1,y:11,name:"录音带",text:"录音里是你的声音：‘如果你听见这句话，不要相信出口。’"}
+};
+const roomText={
+"1,1":"第一间房没有门。只有一面镜子。\n镜子里的你，比现在的你晚了一秒眨眼。",
+"2,1":"墙纸下藏着铅笔字：‘按顺序记住它们。’\n你不知道‘它们’是谁。",
+"3,1":"灯闪了三次。每一次，你都听见有人在叫你。",
+"4,1":"走廊尽头传来脚步声。\n奇怪的是，脚步声与你完全同步。",
+"5,1":"你找到一把钥匙。钥匙很冷，像刚从某人的手里交出来。",
+"7,1":"这里的灰尘没有脚印。\n但你确定，刚刚有人从这里经过。",
+"8,1":"墙上写着：‘记忆不是发生过的事，而是你最后相信的版本。’",
+"9,1":"房间里摆着一台旧收音机。它正在播放你童年的笑声。",
+"10,1":"没有人回答你的敲门。\n门内却传来三声敲门。",
+"11,1":"你看见一张照片。\n照片中的你，正在回头看现在的你。",
+"12,1":"黑色的墨迹覆盖了墙面。\n只留下两个字：醒来。",
+"1,3":"这里的温度突然下降。\n你想起一件事：你曾经来过这里。",
+"2,3":"你不确定这是第一次。\n但你的身体知道该往哪里走。",
+"3,3":"一个声音说：‘别拿走它。’\n声音来自你自己。",
+"5,3":"你发现出口方向的标记被人反复修改。",
+"7,3":"这里没有出口，只有一张椅子。\n椅子上有一道新鲜的压痕。",
+"8,3":"你开始怀疑：所谓迷宫，也许只是记忆的排列方式。",
+"9,3":"地面上有一串数字：07 14 21。\n你没有密码，却突然知道答案。",
+"11,3":"照片背后写着：‘真正的你不会出现在照片里。’",
+"13,3":"墙上出现一道细小裂缝，里面透出微弱的光。",
+"3,5":"你听见门外有人哭。\n可这条走廊里，没有任何门。",
+"5,5":"你记起一个名字，却在说出口前忘掉了它。",
+"6,5":"这里的墙壁像心电图一样起伏。",
+"7,5":"你第一次觉得害怕。\n不是因为这里，而是因为你知道自己害怕什么。",
+"9,5":"旧钟停在 03:17。\n你的手表也是。",
+"11,5":"你突然想离开。\n但回头时，来路已经变成了墙。",
+"1,7":"灰尘里有两组脚印：一组进去，一组出来。\n它们属于同一个人。",
+"2,7":"你听见自己的声音在很远的地方说：‘继续。’",
+"3,7":"墙角放着一盘录音带。\n它似乎在等你。",
+"5,7":"这里的灯不会亮。\n可你能看见一张脸。",
+"7,7":"你触碰墙面。墙里传来心跳。",
+"8,7":"心跳停了。\n然后，走廊里响起了第二个心跳。",
+"9,7":"你开始明白，这个地方并不想困住你。",
+"11,7":"出口就在前方。\n可你还没有准备好知道出口外是什么。",
+"12,7":"一阵风吹过。你闻到雨后的柏油味。",
+"13,7":"门锁没有锁。\n这反而让你更不安。",
+"1,9":"你看见一个写满日期的日历。\n最后一天被圈了起来：今天。",
+"2,9":"你想起自己为什么来到这里，却只记得一个结果：‘必须回来。’",
+"3,9":"地上有血迹。\n它通向你身后，而不是前方。",
+"5,9":"你终于想起那个被删掉的名字。",
+"7,9":"这里的空气很安静。\n安静得像有人屏住呼吸等你做决定。",
+"8,9":"门上写着：‘你可以带走真相，也可以带走自己。’",
+"9,9":"最后一盏灯熄灭。\n黑暗里，有人说：‘欢迎回家。’",
+"11,9":"出口的光变成了白色。\n你突然想起：照片里缺失的人，就是你。"
+};
+let state;
+function freshState(){return{p:{x:1,y:1},visited:new Set(),items:new Set(),order:[],ended:false,start:Date.now(),sound:true,typedTimer:null};}
+state=freshState();
+
+let audioCtx=null, master=null;
+function initAudio(){
+ if(audioCtx){
+   if(audioCtx.state==="suspended") audioCtx.resume().catch(()=>{});
+   return true;
+ }
+ const AC=window.AudioContext||window.webkitAudioContext;
+ if(!AC){soundBtn.textContent="声音：不支持";return false}
+ try{
+   audioCtx=new AC();
+   master=audioCtx.createGain();
+   master.gain.setValueAtTime(.16,audioCtx.currentTime);
+   master.connect(audioCtx.destination);
+   if(audioCtx.state==="suspended") audioCtx.resume().catch(()=>{});
+   return true;
+ }catch(e){soundBtn.textContent="声音：不可用";return false}
+}
+function tone(freq,dur,type="sine",gain=.18){
+ if(!state.sound||!initAudio()||!audioCtx)return;
+ const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+ o.type=type;o.frequency.setValueAtTime(freq,audioCtx.currentTime);
+ g.gain.setValueAtTime(.0001,audioCtx.currentTime);
+ o.connect(g);g.connect(master);
+ const t=audioCtx.currentTime;
+ g.gain.exponentialRampToValueAtTime(Math.max(.001,gain),t+.012);
+ g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+ o.start(t);o.stop(t+dur+.03);
+}
+function ambience(){
+ if(!state.sound||!initAudio()||!audioCtx)return;
+ if(state.drone)return;
+ const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+ o.type="sine";o.frequency.value=48;g.gain.setValueAtTime(.0001,audioCtx.currentTime);
+ o.connect(g);g.connect(master);o.start();
+ g.gain.exponentialRampToValueAtTime(.018,audioCtx.currentTime+.8);
+ state.drone={osc:o,gain:g};
+}
+function stopAmbience(){
+ if(!state.drone||!audioCtx)return;
+ const d=state.drone;
+ d.gain.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+.15);
+ setTimeout(()=>{try{d.osc.stop()}catch(e){}},180);
+ state.drone=null;
+}
+function soundTest(){
+ if(!state.sound)return;
+ if(initAudio()){
+   ambience();
+   tone(392,.12,"sine",.16);
+   setTimeout(()=>tone(523,.16,"triangle",.12),130);
+   log("声音测试：Web Audio 已启动");
+ }
+}
+function typeText(text){
+ clearTimeout(state.typedTimer);storyEl.textContent="";
+ let i=0;
+ const tick=()=>{storyEl.textContent=text.slice(0,i++); if(i<=text.length)state.typedTimer=setTimeout(tick,18)};
+ tick();
+ tone(180,.045,"square",.035);
+}
+function log(s){const d=document.createElement("div");d.textContent="› "+s;logEl.prepend(d)}
+function itemAt(x,y){return Object.entries(itemDefs).find(([,v])=>v.x===x&&v.y===y)?.[0]}
+function getRoomText(){
+ const k=`${state.p.x},${state.p.y}`, base=roomText[k]||"墙壁沉默着。\n你能感觉到某种东西正在观察你的路线。";
+ if(state.items.has("tape")&&state.p.x>=9) return base+"\n\n【录音带】里的声音再次响起：‘出口不是门。’";
+ if(state.items.has("photo")&&state.order.length>=7) return base+"\n\n照片上的空白脸孔，似乎开始慢慢出现轮廓。";
+ return base;
+}
+function enterRoom(){
+ const k=`${state.p.x},${state.p.y}`;
+ if(!state.visited.has(k)){
+   state.visited.add(k);state.order.push(k);roomCountEl.textContent=state.visited.size;log(`进入房间 ${k}`);
+ }
+ const it=itemAt(state.p.x,state.p.y);
+ if(it&&!state.items.has(it)){
+   state.items.add(it);itemsEl.innerHTML="";
+   for(const [id,v] of Object.entries(itemDefs)){if(state.items.has(id)){const s=document.createElement("span");s.className="item hot";s.textContent=v.name;itemsEl.appendChild(s)}}
+   typeText(viaItem(it));log("获得："+itemDefs[it].name);tone(880,.12,"triangle",.25);
+ }
+ if(state.p.x===13&&state.p.y===9) maybeEnding();
+ else {
+   if(state.visited.size===8) log("回廊似乎开始记住你的路线……");
+   if(state.items.size===2) log("两件记忆碎片发生了共鸣。");
+   typeText(getRoomText());
+ }
+}
+function viaItem(it){return itemDefs[it].text}
+function canMove(x,y){return map[y]&&map[y][x]!=="#"}
+function move(dx,dy){
+ if(state.ended)return;
+ if(state.sound){initAudio();ambience();}
+ const nx=state.p.x+dx,ny=state.p.y+dy;
+ if(!canMove(nx,ny)){tone(70,.07,"sawtooth",.12);return}
+ state.p.x=nx;state.p.y=ny;tone(120+Math.random()*50,.045,"square",.04);draw();enterRoom();
+}
+function maybeEnding(){
+ // Three endings depend on both item collection and exploration order.
+ const hasK=state.items.has("key"),hasP=state.items.has("photo"),hasT=state.items.has("tape");
+ let title,text;
+ if(hasT&&hasP&&state.order.length>=14){
+   title="END 03 · 记住自己";
+   text="你没有打开出口。你把录音带放回墙角，又把照片翻到背面。\n\n这一次，你记起了完整的故事：回廊不是监狱，而是你为自己留下的备份。真正的出口，是允许自己忘记。\n\n门开了。外面没有人等你。只有清晨。";
+ }else if(hasK&&hasP){
+   title="END 02 · 门后的人";
+   text="钥匙打开了门。\n\n门后没有怪物，只有一间和起点一模一样的房间。镜子里的人没有再慢半拍。\n\n你终于意识到：你一直在寻找的‘另一个人’，其实是那段被你删掉的记忆。";
+ }else{
+   title="END 01 · 白色走廊";
+   text="你没有找到完整答案，只找到出口。\n\n门外是一条过分明亮的白色走廊。身后的门缓缓消失。\n\n也许逃出去就是结局，也许只是下一层记忆。";
+ }
+ state.ended=true;stateEl.textContent="MEMORY";document.getElementById("endingTitle").textContent=title;document.getElementById("endingText").textContent=text;document.getElementById("ending").style.display="flex";tone(220,.8,"sine",.18);
+}
+function draw(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ for(let y=0;y<map.length;y++)for(let x=0;x<map[y].length;x++){
+  const px=x*TILE,py=y*TILE,wall=map[y][x]==="#";
+  ctx.fillStyle=wall?"#111":"#070707";ctx.fillRect(px,py,TILE,TILE);
+  ctx.strokeStyle=wall?"#252525":"#141414";ctx.strokeRect(px+.5,py+.5,TILE-1,TILE-1);
+ }
+ // visited glow
+ state.visited.forEach(k=>{const [x,y]=k.split(",").map(Number);ctx.fillStyle="#171b08";ctx.fillRect(x*TILE+7,y*TILE+7,TILE-14,TILE-14)});
+ for(const [id,v] of Object.entries(itemDefs))if(!state.items.has(id)){
+  ctx.fillStyle="#d7ff3f";ctx.fillRect(v.x*TILE+17,v.y*TILE+17,14,14);
+  ctx.fillStyle="#000";ctx.fillRect(v.x*TILE+21,v.y*TILE+21,6,6);
+ }
+ // exit
+ ctx.strokeStyle="#d7ff3f";ctx.lineWidth=2;ctx.strokeRect(13*TILE+9,9*TILE+9,TILE-18,TILE-18);
+ // player
+ const cx=state.p.x*TILE+24,cy=state.p.y*TILE+24;
+ ctx.beginPath();ctx.arc(cx,cy,12,0,Math.PI*2);ctx.fillStyle="#eee";ctx.fill();
+ ctx.beginPath();ctx.arc(cx,cy,5,0,Math.PI*2);ctx.fillStyle="#080808";ctx.fill();
+ ctx.lineWidth=1;
+}
+function reset(){
+ stopAmbience();
+ state=freshState();logEl.innerHTML="";itemsEl.innerHTML='<span class="item">空</span>';roomCountEl.textContent="0";stateEl.textContent="AWAKE";document.getElementById("ending").style.display="none";typeText("你醒来时，走廊已经在呼吸。");draw();
+}
+document.addEventListener("keydown",e=>{const k=e.key;if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","w","a","s","d","W","A","S","D"].includes(k)){e.preventDefault();const m={ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]}[k];move(...m)}});
+document.querySelectorAll(".controls button").forEach(b=>b.onclick=()=>{const m={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]}[b.dataset.key];initAudio();ambience();move(...m)});
+soundBtn.onclick=()=>{
+ state.sound=!state.sound;
+ soundBtn.textContent="声音："+(state.sound?"开":"关");
+ if(state.sound){soundTest()}else{stopAmbience();log("声音已关闭")}
+};
+document.getElementById("restart").onclick=reset;document.getElementById("endingRestart").onclick=reset;
+setInterval(()=>{const s=Math.floor((Date.now()-state.start)/1000);timerEl.textContent=String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")},250);
+canvas.onclick=()=>{if(state.sound){soundTest()}};
+draw();
+})();
+</script>
+</body>
+</html>

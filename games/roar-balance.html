@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎪 喊声走钢丝</title>
+<meta name="description" content="用麦克风音量控制走钢丝小人保持平衡：喊得越大声越偏左，安静则向右，也可用 ← → 键玩，掉下去就结束。">
+<meta name="wb-category" content="游戏">
+<meta name="wb-icon" content="🎪">
+<meta name="wb-tags" content="体感,麦克风,平衡,休闲,反应">
+<meta name="wb-order" content="50">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0a2e'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle'%3E%F0%9F%8E%AA%3C/text%3E%3C/svg%3E">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0a2e;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  overflow: hidden;
+  color: #fff;
+}
+#gameCanvas {
+  border: 3px solid #ffd700;
+  border-radius: 12px;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.3);
+  cursor: none;
+}
+#ui {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 10;
+}
+#ui h1 {
+  font-size: 28px;
+  color: #ffd700;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  margin-bottom: 8px;
+}
+#status {
+  font-size: 14px;
+  color: #aaa;
+}
+#micBtn {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 36px;
+  font-size: 18px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  pointer-events: all;
+  transition: all 0.3s;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+}
+#micBtn:hover {
+  transform: translateX(-50%) scale(1.05);
+  box-shadow: 0 6px 30px rgba(102, 126, 234, 0.6);
+}
+#micBtn.hidden { display: none; }
+#keyboardHint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: #666;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<div id="ui">
+  <h1>🎪 喊声走钢丝 🎪</h1>
+  <div id="status">点击按钮授权麦克风，或用键盘 ← → 控制</div></div>
+
+<canvas id="gameCanvas" width="900" height="500"></canvas>
+
+<button id="micBtn">🎤 开启麦克风控制</button>
+<div id="keyboardHint">键盘模式：← 左倾 | → 右倾 | 空格重新开始</div>
+
+<script>
+// ==================== 游戏配置 ====================
+const CONFIG = {
+  wireY: 380,
+  wireStartX: 100,
+  wireEndX: 800,
+  gravity: 0.4,
+  springK: 0.08,
+  damping: 0.96,
+  maxTilt: 0.35,
+  fallAngle: 0.55,
+  walkSpeed: 0.8,
+  micThreshold: 0.15,
+  micForce: 0.008,
+  keyForce: 0.006,
+  windInterval: 180,
+  obstacleInterval: 240,
+};
+
+// ==================== 游戏状态 ====================
+const state = {
+  playerX: CONFIG.wireStartX,
+  playerY: CONFIG.wireY,
+  tilt: 0,
+  tiltVel: 0,
+  walking: false,
+  fallen: false,
+  fallVelX: 0,
+  fallVelY: 0,
+  fallRot: 0,
+  fallRotVel: 0,
+  progress: 0,
+  score: 0,
+  wind: 0,
+  windTimer: 0,
+  windDisplay: '',
+  obstacles: [],
+  obstacleTimer: 0,
+  micVolume: 0,
+  micLeft: 0,
+  micRight: 0,
+  useMic: false,
+  micAuthorized: false,
+  gameOver: false,
+  won: false,
+  particles: [],
+  stars: [],
+  frameCount: 0,
+  shakeAmount: 0,
+};
+
+// ==================== Canvas 设置 ====================
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+// ==================== 初始化星星背景 ====================
+function initStars() {
+  for (let i = 0; i < 80; i++) {
+    state.stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H * 0.7,
+      size: Math.random() * 2 + 0.5,
+      twinkle: Math.random() * Math.PI * 2,
+      speed: Math.random() * 0.02 + 0.01,
+    });
+  }
+}
+initStars();
+
+// ==================== 麦克风处理 ====================
+let audioCtx, analyser, micStream;
+const micBtn = document.getElementById('micBtn');
+const statusEl = document.getElementById('status');
+
+/** 统一设置状态文案 */
+function setStatus(text, color) {
+  statusEl.textContent = text;
+  statusEl.style.color = color;
+}
+
+/** 麦克风不可用时的兜底：保持按钮可点以便重试，并提示改用键盘 */
+function micFailed(msg) {
+  state.useMic = false;
+  state.micAuthorized = false;
+  micBtn.textContent = '🎤 重试麦克风';
+  micBtn.classList.remove('hidden');
+  setStatus(msg, '#ff6666');
+}
+
+micBtn.addEventListener('click', async () => {
+  // 1) 浏览器是否支持
+  const md = navigator.mediaDevices;
+  if (!md || typeof md.getUserMedia !== 'function') {
+    micFailed('❌ 当前浏览器不支持麦克风，请用键盘 ← → 控制');
+    return;
+  }
+
+  micBtn.disabled = true;
+  micBtn.textContent = '⏳ 正在请求授权…';
+  setStatus('请在浏览器弹窗中点击「允许」', '#9fb4ff');
+
+  try {
+    // 2) 先建/恢复音频上下文（Chrome 要求用户手势后才能 resume）
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { micFailed('❌ 当前浏览器不支持 Web Audio，请用键盘 ← → 控制'); return; }
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+    // 3) 请求麦克风
+    micStream = await md.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    });
+
+    const source = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+
+    state.useMic = true;
+    state.micAuthorized = true;
+    micBtn.classList.add('hidden');
+    micBtn.disabled = false;
+    setStatus('🎤 麦克风已开启！对着麦克风喊叫来控制方向', '#66ff66');
+  } catch (e) {
+    micBtn.disabled = false;
+    // 4) 按错误类型给不同的可操作提示
+    const name = (e && e.name) || '';
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      micFailed('❌ 麦克风权限被拒绝（可点「重试」或在地址栏允许），也可用键盘 ← → 控制');
+    } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      micFailed('❌ 没有检测到麦克风设备，请用键盘 ← → 控制');
+    } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+      micFailed('❌ 麦克风被其他程序占用，关闭后点「重试」，或用键盘 ← → 控制');
+    } else {
+      micFailed('❌ 麦克风启动失败（' + (e && e.message ? e.message : '未知错误') + '），可用键盘 ← → 控制');
+    }
+  }
+});
+
+// ==================== 键盘控制 ====================
+const keys = {};
+document.addEventListener('keydown', (e) => {
+  keys[e.key] = true;
+  if (e.key === ' ' && (state.fallen || state.won)) {
+    resetGame();
+  }
+});
+document.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+// ==================== 重置游戏 ====================
+function resetGame() {
+  state.playerX = CONFIG.wireStartX;
+  state.playerY = CONFIG.wireY;
+  state.tilt = 0;
+  state.tiltVel = 0;
+  state.walking = false;
+  state.fallen = false;
+  state.fallVelX = 0;
+  state.fallVelY = 0;
+  state.fallRot = 0;
+  state.fallRotVel = 0;
+  state.progress = 0;
+  state.score = 0;
+  state.wind = 0;
+  state.windTimer = 0;
+  state.windDisplay = '';
+  state.obstacles = [];
+  state.obstacleTimer = 0;
+  state.gameOver = false;
+  state.won = false;
+  state.particles = [];
+  state.frameCount = 0;
+  state.shakeAmount = 0;
+  if (state.useMic && state.micAuthorized) {
+    setStatus('🎤 麦克风已开启！对着麦克风喊叫来控制方向', '#66ff66');
+  } else if (state.micAuthorized) {
+    setStatus('使用键盘 ← → 控制倾斜方向', '#aaa');
+  } else {
+    setStatus('使用键盘 ← → 控制倾斜方向', '#aaa');
+  }
+}
+
+// ==================== 获取麦克风音量 ====================
+// 说明：不能依赖左右声道差值 —— 绝大多数笔记本/耳麦是单声道，
+// getByteTimeDomainData 左右两半几乎一样，差值恒为 0，会导致「开了麦克风也没反应」。
+// 所以用「音量大小 → 推力方向」的映射：喊得越响越往一个方向压，安静时回摆。
+function getMicData() {
+  if (!state.useMic || !analyser) return { vol: 0, left: 0, right: 0 };
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const v = (buf[i] - 128) / 128;
+    sum += v * v;
+  }
+  const vol = Math.sqrt(sum / buf.length);
+  return { vol, left: vol, right: vol };
+}
+
+// ==================== 生成障碍物 ====================
+function spawnObstacle() {
+  const types = ['bird', 'balloon', 'cloud'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const fromLeft = Math.random() > 0.5;
+  state.obstacles.push({
+    x: fromLeft ? -30 : W + 30,
+    y: CONFIG.wireY - 60 - Math.random() * 100,
+    type,
+    dir: fromLeft ? 1 : -1,
+    speed: 1.5 + Math.random() * 2,
+    hit: false,
+    size: 25 + Math.random() * 15,
+  });
+}
+
+// ==================== 生成粒子 ====================
+function spawnParticles(x, y, count, color) {
+  for (let i = 0; i < count; i++) {
+    state.particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8 - 3,
+      life: 1,
+      decay: 0.01 + Math.random() * 0.02,
+      size: 2 + Math.random() * 4,
+      color,
+    });
+  }
+}
+
+// ==================== 物理更新 ====================
+function updatePhysics() {
+  if (state.gameOver) return;
+
+  state.frameCount++;
+
+  // 获取输入力
+  let force = 0;
+
+  if (state.useMic && state.micAuthorized) {
+    const mic = getMicData();
+    state.micVolume = mic.vol;
+    state.micLeft = mic.left;
+    state.micRight = mic.right;
+
+    // 音量 → 推力：超过阈值后，喊得越响向左推得越猛；阈值以下缓慢回正。
+    // （不再依赖左右声道差值，单声道麦克风也能玩）
+    if (mic.vol > CONFIG.micThreshold) {
+      const loud = Math.min(1, (mic.vol - CONFIG.micThreshold) / (0.35 - CONFIG.micThreshold));
+      force -= CONFIG.micForce * (0.4 + loud * 2.6);
+      state.walking = true;
+      state.micLoud = loud;
+    } else {
+      // 安静时给一个向右的轻微回摆，形成「吼叫↔安静」的来回控制
+      force += CONFIG.micForce * 0.5;
+      state.walking = false;
+      state.micLoud = 0;
+    }
+  }
+
+  // 键盘控制
+  if (keys['ArrowLeft']) {
+    force -= CONFIG.keyForce;
+    state.walking = true;
+  }
+  if (keys['ArrowRight']) {
+    force += CONFIG.keyForce;
+    state.walking = true;
+  }
+
+  // 风力
+  state.windTimer++;
+  if (state.windTimer > CONFIG.windInterval) {
+    state.windTimer = 0;
+    const windStrength = (Math.random() - 0.5) * 0.015;
+    state.wind = windStrength;
+    const windNames = ['微风', '强风', '狂风', '龙卷风', '无风'];
+    const idx = Math.min(Math.floor(Math.abs(windStrength) * 200), 4);
+    state.windDisplay = windNames[idx] + (windStrength > 0 ? ' →' : windStrength < 0 ? ' ←' : '');
+  }
+  force += state.wind;
+
+  // 障碍物碰撞力
+  for (const obs of state.obstacles) {
+    if (!obs.hit) continue;
+    const dx = state.playerX - obs.x;
+    const dist = Math.sqrt(dx * dx + 400);
+    if (dist < obs.size + 20) {
+      force += (dx > 0 ? 1 : -1) * 0.012;
+      spawnParticles(state.playerX, state.playerY - 30, 3, '#ff4444');
+    }
+  }
+
+  // 弹簧阻尼物理
+  state.tiltVel += force;
+  state.tiltVel -= state.tilt * CONFIG.springK;
+  state.tiltVel *= CONFIG.damping;
+  state.tilt += state.tiltVel;
+  state.tilt = Math.max(-CONFIG.maxTilt, Math.min(CONFIG.maxTilt, state.tilt));
+
+  // 行走进度
+  if (state.walking && !state.fallen) {
+    state.progress += CONFIG.walkSpeed;
+    state.playerX = CONFIG.wireStartX + (state.progress / 100) * (CONFIG.wireEndX - CONFIG.wireStartX);
+    state.score = Math.floor(state.progress);
+  }
+
+  // 自然摇晃
+  if (!state.walking && !state.fallen) {
+    state.tilt += Math.sin(state.frameCount * 0.03) * 0.002;
+  }
+
+  // 障碍物生成
+  state.obstacleTimer++;
+  if (state.obstacleTimer > CONFIG.obstacleInterval) {
+    state.obstacleTimer = 0;
+    if (Math.random() > 0.4) spawnObstacle();
+  }
+
+  // 更新障碍物
+  for (let i = state.obstacles.length - 1; i >= 0; i--) {
+    const obs = state.obstacles[i];
+    obs.x += obs.speed * obs.dir;
+    // 检测碰撞
+    if (!obs.hit) {
+      const dx = Math.abs(state.playerX - obs.x);
+      const dy = Math.abs((state.playerY - 30) - obs.y);
+      if (dx < 30 && dy < obs.size) {
+        obs.hit = true;
+        force += obs.dir * 0.02;
+        spawnParticles(obs.x, obs.y, 5, '#ffaa00');
+      }
+    }
+    if (obs.x < -60 || obs.x > W + 60) {
+      state.obstacles.splice(i, 1);
+    }
+  }
+
+  // 更新粒子
+  for (let i = state.particles.length - 1; i >= 0; i--) {
+    const p = state.particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;
+    p.life -= p.decay;
+    if (p.life <= 0) state.particles.splice(i, 1);
+  }
+
+  // 检测掉落
+  if (Math.abs(state.tilt) > CONFIG.fallAngle && !state.fallen) {
+    state.fallen = true;
+    state.gameOver = true;
+    state.fallVelX = state.tilt * 8;
+    state.fallVelY = -3;
+    state.fallRotVel = state.tilt * 5;
+    state.shakeAmount = 15;
+    spawnParticles(state.playerX, state.playerY - 30, 20, '#ffd700');
+    statusEl.textContent = '💥 掉下去了！按空格键重新开始';
+    statusEl.style.color = '#ff6666';
+  }
+
+  // 检测胜利
+  if (state.progress >= 100 && !state.fallen) {
+    state.won = true;
+    state.gameOver = true;
+    spawnParticles(state.playerX, state.playerY - 50, 30, '#66ff66');
+    spawnParticles(state.playerX, state.playerY - 50, 20, '#ffd700');
+    statusEl.textContent = '🎉 成功到达终点！按空格键再玩一次';
+    statusEl.style.color = '#66ff66';
+  }
+
+  // 掉落物理
+  if (state.fallen) {
+    state.fallVelY += CONFIG.gravity;
+    state.playerX += state.fallVelX;
+    state.playerY += state.fallVelY;
+    state.fallRot += state.fallRotVel;
+    state.shakeAmount *= 0.9;
+
+    // 落地反弹
+    if (state.playerY > H + 50) {
+      state.fallVelY *= -0.3;
+      state.fallVelX *= 0.5;
+      state.fallRotVel *= 0.5;
+    }
+  }
+}
+
+// ==================== 绘制函数 ====================
+function drawBackground() {
+  // 渐变天空
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#0a0a2e');
+  grad.addColorStop(0.5, '#1a1a4e');
+  grad.addColorStop(1, '#0d1b3e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // 星星
+  for (const star of state.stars) {
+    star.twinkle += star.speed;
+    const alpha = 0.4 + Math.sin(star.twinkle) * 0.4;
+    ctx.fillStyle = `rgba(255, 255, 220, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 月亮
+  ctx.fillStyle = '#ffffcc';
+  ctx.shadowColor = '#ffffcc';
+  ctx.shadowBlur = 30;
+  ctx.beginPath();
+  ctx.arc(750, 80, 35, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function drawWire() {
+  // 支架
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 6;
+  // 左支架
+  ctx.beginPath();
+  ctx.moveTo(CONFIG.wireStartX, CONFIG.wireY);
+  ctx.lineTo(CONFIG.wireStartX - 20, H);
+  ctx.stroke();
+  // 右支架
+  ctx.beginPath();
+  ctx.moveTo(CONFIG.wireEndX, CONFIG.wireY);
+  ctx.lineTo(CONFIG.wireEndX + 20, H);
+  ctx.stroke();
+
+  // 钢丝
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(CONFIG.wireStartX - 30, CONFIG.wireY + 5);
+  ctx.lineTo(CONFIG.wireEndX + 30, CONFIG.wireY + 5);
+  ctx.stroke();
+
+  // 钢丝高光
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(CONFIG.wireStartX - 30, CONFIG.wireY + 4);
+  ctx.lineTo(CONFIG.wireEndX + 30, CONFIG.wireY + 4);
+  ctx.stroke();
+}
+
+function drawPlayer(x, y, tilt, isFalling) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  if (isFalling) {
+    ctx.rotate(state.fallRot);
+  } else {
+    ctx.rotate(tilt);
+  }
+
+  const s = 1;
+
+  // 身体
+  ctx.strokeStyle = '#ff6b6b';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+
+  // 躯干
+  ctx.beginPath();
+  ctx.moveTo(0, -10 * s);
+  ctx.lineTo(0, -35 * s);
+  ctx.stroke();
+
+  // 头
+  ctx.fillStyle = '#ffd93d';
+  ctx.strokeStyle = '#ff6b6b';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, -42 * s, 8 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // 眼睛
+  ctx.fillStyle = '#333';
+  if (isFalling) {
+    // 掉落时眼睛画成 ×
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-4, -45); ctx.lineTo(-1, -42);
+    ctx.moveTo(-1, -45); ctx.lineTo(-4, -42);
+    ctx.moveTo(1, -45);  ctx.lineTo(4, -42);
+    ctx.moveTo(4, -45);  ctx.lineTo(1, -42);
+    ctx.stroke();
+  } else {
+    ctx.beginPath();
+    ctx.arc(-2.5, -43, 1.6, 0, Math.PI * 2);
+    ctx.arc(2.5, -43, 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 平衡杆（双手横举的长杆）
+  ctx.strokeStyle = '#ffd93d';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-26, -32 * s);
+  ctx.lineTo(26, -32 * s);
+  ctx.stroke();
+
+  // 手臂
+  ctx.strokeStyle = '#ff6b6b';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -32 * s); ctx.lineTo(-24, -32 * s);
+  ctx.moveTo(0, -32 * s); ctx.lineTo(24, -32 * s);
+  ctx.stroke();
+
+  // 双腿（踩在钢丝上）
+  ctx.beginPath();
+  ctx.moveTo(0, -10 * s); ctx.lineTo(-7, 0);
+  ctx.moveTo(0, -10 * s); ctx.lineTo(7, 0);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ==================== 绘制障碍物 ====================
+function drawObstacles() {
+  for (const obs of state.obstacles) {
+    ctx.save();
+    ctx.translate(obs.x, obs.y);
+    const r = obs.size;
+
+    if (obs.type === 'bird') {
+      ctx.fillStyle = '#ff8c42';
+      // 身体
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.8, r * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 翅膀（拍打）
+      const flap = Math.sin(state.frameCount * 0.3) * r * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.2, 0);
+      ctx.lineTo(-r * 1.1, -flap);
+      ctx.lineTo(r * 0.2, -r * 0.2);
+      ctx.closePath();
+      ctx.fill();
+      // 嘴
+      ctx.fillStyle = '#ffd93d';
+      ctx.beginPath();
+      ctx.moveTo(r * 0.7, 0);
+      ctx.lineTo(r * 1.15, -r * 0.12);
+      ctx.lineTo(r * 0.7, r * 0.18);
+      ctx.closePath();
+      ctx.fill();
+      // 眼
+      ctx.fillStyle = '#222';
+      ctx.beginPath();
+      ctx.arc(r * 0.35, -r * 0.15, r * 0.11, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (obs.type === 'balloon') {
+      ctx.fillStyle = '#e056fd';
+      // 球体
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.3, r * 0.7, r * 0.85, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.22, -r * 0.55, r * 0.16, r * 0.24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // 线
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(0, r * 0.55);
+      ctx.quadraticCurveTo(r * 0.2, r * 1.0, 0, r * 1.4);
+      ctx.stroke();
+    } else {
+      // 云
+      ctx.fillStyle = 'rgba(200, 210, 255, 0.85)';
+      ctx.beginPath();
+      ctx.arc(-r * 0.5, 0, r * 0.55, 0, Math.PI * 2);
+      ctx.arc(0, -r * 0.25, r * 0.7, 0, Math.PI * 2);
+      ctx.arc(r * 0.55, 0, r * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+}
+
+// ==================== 绘制粒子 ====================
+function drawParticles() {
+  for (const p of state.particles) {
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ==================== 绘制 HUD ====================
+function drawHUD() {
+  // 进度条
+  const barX = 40, barY = 30, barW = W - 80, barH = 12;
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(barX, barY, barW, barH);
+  ctx.fillStyle = '#ffd700';
+  ctx.fillRect(barX, barY, barW * Math.min(1, state.progress / 100), barH);
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(barX, barY, barW, barH);
+
+  // 分数 / 进度
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 14px "Segoe UI", "Microsoft YaHei", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('进度 ' + Math.min(100, state.score) + '%', barX, barY + barH + 18);
+
+  // 风力提示
+  if (state.windDisplay) {
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#9fb4ff';
+    ctx.fillText('风：' + state.windDisplay, barX + barW, barY + barH + 18);
+  }
+
+  // 麦克风音量条（开启后才显示）
+  if (state.useMic && state.micAuthorized) {
+    const mw = 160, mh = 8;
+    const mx = 40, my = H - 26;
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(mx, my, mw, mh);
+    const lvl = Math.min(1, state.micVolume / 0.4);
+    ctx.fillStyle = lvl > CONFIG.micThreshold / 0.4 ? '#66ff66' : '#667eea';
+    ctx.fillRect(mx, my, mw * lvl, mh);
+    ctx.fillStyle = '#888';
+    ctx.font = '11px "Segoe UI", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('麦克风音量', mx, my - 5);
+  }
+
+  // 提示语
+  if (state.gameOver) {
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 30px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = state.won ? '#66ff66' : '#ff6b6b';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 20;
+    ctx.fillText(state.won ? '🎉 到达终点！' : '💥 掉下去了！', W / 2, H / 2 - 10);
+    ctx.shadowBlur = 0;
+    ctx.font = '16px "Segoe UI", "Microsoft YaHei", sans-serif';
+    ctx.fillStyle = '#ddd';
+    ctx.fillText('按空格键重新开始', W / 2, H / 2 + 26);
+  }
+}
+
+// ==================== 主循环 ====================
+function loop() {
+  ctx.save();
+
+  // 掉落时的镜头抖动
+  if (state.shakeAmount > 0.5) {
+    ctx.translate(
+      (Math.random() - 0.5) * state.shakeAmount,
+      (Math.random() - 0.5) * state.shakeAmount
+    );
+  }
+
+  drawBackground();
+  drawWire();
+  drawObstacles();
+  drawPlayer(state.playerX, state.playerY, state.tilt, state.fallen);
+  drawParticles();
+
+  ctx.restore();
+
+  drawHUD();
+
+  updatePhysics();
+  requestAnimationFrame(loop);
+}
+
+// ==================== 启动 ====================
+// 让按钮在页面加载后一定可点（脚本在 body 末尾，节点此时已存在）
+if (micBtn && !micBtn.dataset.bound) {
+  micBtn.dataset.bound = '1';
+}
+
+loop();
+</script>
+</body>
+</html>

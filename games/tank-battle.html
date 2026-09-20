@@ -1,0 +1,1614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>坦克大战 · 十关战役 | Tank Battle</title>
+<!-- ===== 导航站约定标签 ===== -->
+<meta name="description" content="经典坦克大战：守老巢、歼敌军，十关战役任你打，砖墙炸开、道具吃满。">
+<meta name="wb-category" content="游戏">
+<meta name="wb-icon" content="🎖️">
+<meta name="wb-tags" content="坦克,射击,关卡,经典,街机">
+<meta name="wb-order" content="100">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0e14'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle'%3E%F0%9F%8E%96%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#070a12; --panel:rgba(255,255,255,.045); --brd:rgba(255,255,255,.10);
+    --txt:#e8eefc; --dim:#8494b3; --a1:#43e0ff; --a2:#a855f7;
+    --good:#4ade80; --bad:#ff5d73; --warn:#fbbf24;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    padding:14px 12px;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(67,224,255,.10), transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, rgba(168,85,247,.10), transparent 55%),
+      var(--bg);
+    color:var(--txt);
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    user-select:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;
+  }
+  h1{
+    margin:0;font-size:20px;letter-spacing:1px;
+    background:linear-gradient(135deg,var(--a1),var(--a2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hint{margin:0;font-size:12px;color:var(--dim);text-align:center;line-height:1.5}
+  .stage{
+    display:flex;gap:14px;align-items:flex-start;justify-content:center;flex-wrap:wrap;
+  }
+  .frame{
+    width:min(92vw,432px);background:var(--panel);border:1px solid var(--brd);
+    border-radius:16px;padding:10px;backdrop-filter:blur(8px);
+    box-shadow:0 18px 50px rgba(0,0,0,.45);
+  }
+  canvas{display:block;width:100%;height:auto;border-radius:10px;background:#04060c;image-rendering:pixelated}
+  .side{
+    width:min(92vw,150px);display:flex;flex-direction:column;gap:8px;
+  }
+  .stat{padding:7px 10px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid var(--brd)}
+  .stat b{display:block;font-size:16px;color:var(--a1);font-variant-numeric:tabular-nums}
+  .stat span{font-size:10.5px;color:var(--dim)}
+  .roster{display:flex;flex-wrap:wrap;gap:3px;padding:7px;border-radius:11px;background:rgba(255,255,255,.05);border:1px solid var(--brd)}
+  .roster i{width:11px;height:11px;border-radius:3px;background:var(--bad);display:block;opacity:.9}
+  .roster i.dead{background:rgba(255,255,255,.10)}
+  .bar{display:flex;gap:8px;margin-top:8px}
+  button{
+    flex:1;font:inherit;font-size:13.5px;padding:9px 0;border-radius:11px;cursor:pointer;
+    border:0;font-weight:600;color:#04121a;
+    background:linear-gradient(135deg,var(--a1),var(--a2));
+  }
+  button.ghost{background:transparent;color:var(--txt);border:1px solid var(--brd)}
+  /* 触屏方向键 */
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+  .pad button{
+    font-size:17px;padding:11px 0;background:rgba(255,255,255,.07);color:var(--txt);border:1px solid var(--brd);
+  }
+  .pad button:active{background:rgba(67,224,255,.25)}
+  .pad .sp{visibility:hidden}
+  .pad .fire{background:linear-gradient(135deg,var(--bad),#ff9f43);color:#1a0509;grid-column:span 3}
+  @media (max-width:560px){
+    .stage{flex-direction:column;align-items:center}
+    .side{width:min(92vw,432px);flex-direction:row;flex-wrap:wrap}
+    .side .stat{flex:1;min-width:70px}
+    .side .roster{width:100%;justify-content:center}
+    .pad{max-width:432px}
+  }
+</style>
+</head>
+<body>
+  <h1>坦克大战 · 十关战役</h1>
+  <p class="hint">方向键 / WASD 移动 · 空格 开炮 · 手机用下方按键 · 守住老巢，歼灭火力</p>
+
+  <div class="stage">
+    <div class="frame">
+      <canvas id="cv" width="416" height="416"></canvas>
+      <div class="bar">
+        <button id="btn-start">开始战斗</button>
+        <button id="btn-restart" class="ghost">重打本关</button>
+      </div>
+      <div class="pad">
+        <button class="sp"></button>
+        <button data-dir="up">▲</button>
+        <button class="sp"></button>
+        <button data-dir="left">◀</button>
+        <button data-dir="down">▼</button>
+        <button data-dir="right">▶</button>
+        <button class="fire" data-dir="fire">开炮</button>
+      </div>
+    </div>
+    <div class="side">
+      <div class="stat"><b id="ui-stage">1</b><span>关卡 / 10</span></div>
+      <div class="stat"><b id="ui-enemy">0</b><span>剩余敌军</span></div>
+      <div class="stat"><b id="ui-life">3</b><span>剩余生命</span></div>
+      <div class="stat"><b id="ui-score">0</b><span>得分</span></div>
+      <div class="stat"><b id="ui-best">0</b><span>最高分</span></div>
+      <div class="roster" id="ui-roster" title="场上敌军"></div>
+    </div>
+  </div>
+
+<script>
+/* ==========================================================================
+   坦克大战（Battle City 致敬版）· 单文件零依赖
+   网格：26×26 半格（每格 16 逻辑像素 = 1 个坦克宽度），画布 416×416
+   坦克尺寸 32×32（即 2×2 半格），移动步长 16 的约数，保证能穿窄道
+   ========================================================================== */
+'use strict';
+
+var cv  = document.getElementById('cv');
+var ctx = cv.getContext('2d');
+var W = cv.width, H = cv.height;
+
+var uiStage  = document.getElementById('ui-stage');
+var uiEnemy  = document.getElementById('ui-enemy');
+var uiLife   = document.getElementById('ui-life');
+var uiScore  = document.getElementById('ui-score');
+var uiBest   = document.getElementById('ui-best');
+var uiRoster = document.getElementById('ui-roster');
+var btnStart = document.getElementById('btn-start');
+
+var BEST_KEY = 'tank-battle-best';
+var FPS = 60;
+
+/* --------------------------- 网格与常量 --------------------------------- */
+var G = 26;          // 26×26 半格
+var CS = W / G;      // 每格 16px
+var TANK = 2;        // 坦克占 2×2 格（32px）
+var BULLET_SPEED = 4;
+
+// 地形类型
+var EMPTY = 0, BRICK = 1, STEEL = 2, GRASS = 3, WATER = 4, ICE = 5, BASE = 9;
+
+var TANK_KIND = {
+  player: { speed: 1.30, hp: 1, score: 0,  bullet: 1, color: '#fbbf24' },
+  basic:  { speed: 0.90, hp: 1, score: 100, bullet: 1, color: '#9aa7bd' },
+  fast:   { speed: 1.70, hp: 1, score: 200, bullet: 1, color: '#43e0ff' },
+  power:  { speed: 1.00, hp: 1, score: 300, bullet: 1, color: '#ff7a45' },
+  armor:  { speed: 0.85, hp: 4, score: 400, bullet: 1, color: '#4ade80' }
+};
+
+/* --------------------------- 十关地图 ----------------------------------- */
+/* 每关一个 26 字符 × 13 行的字符串数组，每个字符代表 2×2 的半格：
+     . 空地   B 砖墙   S 钢墙   G 草地   W 水   I 冰
+   第 13/14 行（底部）的第 11-14 列放老巢（基地），自动生成，不需要写。
+   行数 13、列数 13，程序会展开成 26×26。
+*/
+var MAPS = [
+  /* 第 1 关 —— 经典开局：对称砖墙方阵 */
+  [
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    "..............",
+    "BB.BB..BB.BB..",
+    "BB.BB..BB.BB..",
+    "..............",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    ".............",
+  ],
+  /* 第 2 关 —— 钢墙走廊 */
+  [
+    "SS..SS..SS...",
+    "SS..SS..SS...",
+    ".............",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    "SS....SS.....",
+    "SS....SS.....",
+    ".............",
+    "..GG..GG..GG.",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    ".............",
+    ".............",
+  ],
+  /* 第 3 关 —— 水域迷宫 */
+  [
+    "..WW..WW..WW.",
+    "..WW..WW..WW.",
+    ".............",
+    "BB..BB..BB...",
+    "BB..BB..BB...",
+    "..WWWWWWWW...",
+    "..WWWWWWWW...",
+    ".............",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    ".............",
+    "..SS......SS.",
+    ".............",
+  ],
+  /* 第 4 关 —— 草地伏击 */
+  [
+    "..GGGGGG.....",
+    "..GGGGGG.....",
+    ".............",
+    "GG..BB..BB..",
+    "GG..BB..BB..",
+    ".............",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    ".............",
+    "GG..GG..GG..",
+    "GG..GG..GG..",
+    ".............",
+    ".............",
+  ],
+  /* 第 5 关 —— 钢砖交错 */
+  [
+    "S.B.S.B.S.B..",
+    "S.B.S.B.S.B..",
+    ".............",
+    ".B.S.B.S.B.S.",
+    ".B.S.B.S.B.S.",
+    ".............",
+    "S.B.S.B.S.B..",
+    "S.B.S.B.S.B..",
+    ".............",
+    ".B.S.B.S.B.S.",
+    ".B.S.B.S.B.S.",
+    ".............",
+    ".............",
+  ],
+  /* 第 6 关 —— 冰面战场 */
+  [
+    "..II..II..II.",
+    "..II..II..II.",
+    ".............",
+    "II..BB..BB..",
+    "II..BB..BB..",
+    ".............",
+    "..II..II..II.",
+    "..II..II..II.",
+    ".............",
+    "BB..II..II..",
+    "BB..II..II..",
+    ".............",
+    ".............",
+  ],
+  /* 第 7 关 —— 双走廊 */
+  [
+    "BB........BB.",
+    "BB........BB.",
+    "..SSSSSSSS...",
+    ".............",
+    "BB........BB.",
+    "BB........BB.",
+    "..SSSSSSSS...",
+    ".............",
+    "BB........BB.",
+    "BB........BB.",
+    "..SSSSSSSS...",
+    ".............",
+    ".............",
+  ],
+  /* 第 8 关 —— 水钢堡垒 */
+  [
+    "WW..SS..WW...",
+    "WW..SS..WW...",
+    ".............",
+    "..WW..WW..WW.",
+    "..WW..WW..WW.",
+    "SS..SS..SS...",
+    "SS..SS..SS...",
+    ".............",
+    "..GG..GG..GG.",
+    "..BB..BB..BB.",
+    "..BB..BB..BB.",
+    "..SS......SS.",
+    ".............",
+  ],
+  /* 第 9 关 —— 密集砖阵 */
+  [
+    "B.B.B.B.B.B..",
+    "B.B.B.B.B.B..",
+    ".............",
+    "BBBB..BBBB...",
+    "BBBB..BBBB...",
+    ".............",
+    "..BBBB..BBBB.",
+    "..BBBB..BBBB.",
+    ".............",
+    "B.B.B.B.B.B..",
+    "B.B.B.B.B.B..",
+    "..SS......SS.",
+    ".............",
+  ],
+  /* 第 10 关 —— 终极要塞 */
+  [
+    "SS.BB.SS.BB.",
+    "SS.BB.SS.BB.",
+    ".............",
+    "BB.WW.WW.BB.",
+    "BB.WW.WW.BB.",
+    "..GG..GG....",
+    "..GG..GG....",
+    ".............",
+    "SS.BB.BB.SS.",
+    "SS.BB.BB.SS.",
+    "..II..II....",
+    "..SS......SS.",
+    ".............",
+  ]
+];
+
+/* 每关敌军编成（按顺序出场）：总计 20 辆 */
+var STAGE_ROSTER = [
+  { basic: 18, fast: 2,  power: 0, armor: 0 },
+  { basic: 14, fast: 4,  power: 2, armor: 0 },
+  { basic: 14, fast: 4,  power: 0, armor: 2 },
+  { basic: 12, fast: 4,  power: 4, armor: 0 },
+  { basic: 10, fast: 4,  power: 4, armor: 2 },
+  { basic: 10, fast: 4,  power: 4, armor: 2 },
+  { basic: 8,  fast: 4,  power: 4, armor: 4 },
+  { basic: 8,  fast: 6,  power: 4, armor: 2 },
+  { basic: 6,  fast: 6,  power: 4, armor: 4 },
+  { basic: 6,  fast: 6,  power: 4, armor: 4 }
+];
+
+var TOTAL_PER_STAGE = 20;
+/* 同屏敌军上限。经典单人模式是 4 辆，但这里坦克相对场地更大、老巢又是
+   全方向可绕的，4 辆齐压时玩家几乎无法兼顾进攻与回防 → 降到 3 辆，
+   难度靠「20 辆总量 + 后期装甲加厚」来保证。 */
+var MAX_ON_FIELD = 3;
+
+/* --------------------------- 游戏状态 ----------------------------------- */
+var state = {
+  running: false, over: false, won: false,
+  score: 0, best: 0, frame: 0,
+  stage: 1, life: 3,
+  spawnTimer: 0, spawnIndex: 0,
+  killedByType: { basic: 0, fast: 0, power: 0, armor: 0 },
+  flash: 0, message: '', messageTimer: 0,
+  freezeTimer: 0,   // 时钟道具：敌军停止
+  shovelTimer: 0,   // 铁锹道具：基地变钢
+  graceTimer: 0,    // 开局保护：老巢短暂免疫
+  baseAlive: true
+};
+
+var grid = [];             // 26×26 地形
+var player = null;
+var enemies = [];
+var bullets = [];
+var effects = [];          // 爆炸等特效
+var powerup = null;        // 场上的道具
+var shieldTimer = 0;       // 玩家无敌
+
+/* --------------------------- 音效 --------------------------------------- */
+var ac = null;
+function beep(freq, dur, type, vol) {
+  try {
+    if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === 'suspended') ac.resume();
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'square';
+    o.frequency.value = freq;
+    g.gain.value = vol == null ? 0.05 : vol;
+    o.connect(g); g.connect(ac.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+    o.stop(ac.currentTime + dur);
+  } catch (e) {}
+}
+function sfxShoot() { beep(520, 0.07, 'square', 0.04); }
+function sfxHitWall() { beep(180, 0.05, 'square', 0.035); }
+function sfxBoom() {
+  beep(140, 0.18, 'sawtooth', 0.06);
+  setTimeout(function () { beep(90, 0.22, 'sawtooth', 0.05); }, 60);
+}
+function sfxStageClear() {
+  [523, 659, 784, 1047].forEach(function (f, i) {
+    setTimeout(function () { beep(f, 0.18, 'triangle', 0.06); }, i * 130);
+  });
+}
+function sfxGameOver() {
+  [392, 330, 262, 196].forEach(function (f, i) {
+    setTimeout(function () { beep(f, 0.3, 'sawtooth', 0.06); }, i * 190);
+  });
+}
+function sfxPowerup() {
+  [700, 900, 1200].forEach(function (f, i) {
+    setTimeout(function () { beep(f, 0.1, 'square', 0.05); }, i * 70);
+  });
+}
+
+/* --------------------------- 地图构建 ----------------------------------- */
+var BASE_COL = 11, BASE_ROW = 12;   // 26×26 里的老巢位置（占 4 格宽 2 格高）
+
+function buildGrid(stage) {
+  grid = [];
+  for (var y = 0; y < G; y++) {
+    grid[y] = [];
+    for (var x = 0; x < G; x++) grid[y][x] = EMPTY;
+  }
+
+  var map = MAPS[(stage - 1) % MAPS.length];
+  // 每关用 stage 作为种子做轻微扰动，避免每关完全一样
+  for (var ry = 0; ry < map.length && ry < 13; ry++) {
+    var row = map[ry];
+    for (var rx = 0; rx < row.length && rx < 13; rx++) {
+      var ch = row.charAt(rx);
+      var t = EMPTY;
+      if (ch === 'B') t = BRICK;
+      else if (ch === 'S') t = STEEL;
+      else if (ch === 'G') t = GRASS;
+      else if (ch === 'W') t = WATER;
+      else if (ch === 'I') t = ICE;
+      if (t === EMPTY) continue;
+      // 展开成 2×2
+      for (var dy = 0; dy < 2; dy++) {
+        for (var dx = 0; dx < 2; dx++) {
+          var gx = rx * 2 + dx, gy = ry * 2 + dy;
+          if (gx < G && gy < G) grid[gy][gx] = t;
+        }
+      }
+    }
+  }
+
+  /* 清出三个敌军出生点与玩家出生点，保证不会一出生就被卡死或立刻被打 */
+  // 敌军出生点（左上、上中、上右）—— 注意 (0,0) 是敌军的，不是玩家的
+  clearArea(0, 0, 3, 3);
+  clearArea(12, 0, 15, 3);
+  clearArea(24, 0, 26, 3);
+  // 玩家出生点（左下角），要和三个敌军出生点区分开
+  clearArea(PLAYER_SPAWN.col - 1, PLAYER_SPAWN.row - 1, PLAYER_SPAWN.col + 3, G);
+  /* 先给老巢清出一个干净的空场，再砌护罩。
+     否则地图自带的砖/钢会和护罩连成一片，把基地围成铁桶 ——
+     玩家进不去、也打不穿，只能眼看敌军从别的方向拆家。
+     清的范围要盖住底边两侧，保证基地左右都有可站位的通道。 */
+  clearArea(BASE_COL - 4, BASE_ROW - 4, BASE_COL + 6, G);
+
+  // 放置老巢（2×2 星形）
+  var bc = BASE_COL, br = BASE_ROW;
+  grid[br][bc] = BASE;     grid[br][bc + 1] = BASE;
+  grid[br + 1][bc] = BASE; grid[br + 1][bc + 1] = BASE;
+
+  /* 老巢周围砌双层砖墙护罩（坐标见 baseShieldCells）。
+     单层砖太脆 —— 敌军一轮齐射就破，实测基地 8 秒就失守。 */
+  var shield = baseShieldCells();
+  for (var i = 0; i < shield.length; i++) {
+    var sx = shield[i][0], sy = shield[i][1];
+    if (sx >= 0 && sx < G && sy >= 0 && sy < G && grid[sy][sx] !== BASE) {
+      grid[sy][sx] = BRICK;
+    }
+  }
+}
+
+/* 把矩形区域清空（含边界），但不碰老巢本身 */
+function clearArea(x0, y0, x1, y1) {
+  for (var y = Math.max(0, y0); y < Math.min(G, y1); y++) {
+    for (var x = Math.max(0, x0); x < Math.min(G, x1); x++) {
+      if (grid[y][x] !== BASE) grid[y][x] = EMPTY;
+    }
+  }
+}
+
+/* --------------------------- 碰撞 --------------------------------------- */
+/* 坦克是 32×32（2×2 格）。检查以像素矩形 (px,py,32,32) 占据的所有格子 */
+function tankBlocked(px, py, isPlayer) {
+  if (px < 0 || py < 0 || px + 32 > W || py + 32 > H) return true;
+  var x0 = Math.floor(px / CS), x1 = Math.floor((px + 31) / CS);
+  var y0 = Math.floor(py / CS), y1 = Math.floor((py + 31) / CS);
+  for (var y = y0; y <= y1; y++) {
+    for (var x = x0; x <= x1; x++) {
+      if (y < 0 || y >= G || x < 0 || x >= G) return true;
+      var t = grid[y][x];
+      if (t === BRICK || t === STEEL || t === WATER || t === BASE) return true;
+      // 草地(GRASS)不阻挡，冰(ICE)不阻挡
+    }
+  }
+  return false;
+}
+
+/* 坦克之间的碰撞：矩形重叠检测 */
+function tanksOverlap(px, py, self) {
+  var i, t;
+  for (i = 0; i < enemies.length; i++) {
+    t = enemies[i];
+    if (t === self || !t.alive) continue;
+    if (px < t.x + 32 && px + 32 > t.x && py < t.y + 32 && py + 32 > t.y) return true;
+  }
+  if (player && player.alive && player !== self) {
+    t = player;
+    if (px < t.x + 32 && px + 32 > t.x && py < t.y + 32 && py + 32 > t.y) return true;
+  }
+  return false;
+}
+
+/* 防死锁：把一辆卡住的坦克挪到最近的合法空地。
+   返回 true 表示挪成功；false 表示全图找不到落脚点（极罕见，此时宁可跳过这辆也别卡关）。
+   只挪到「本关内部」的格子边界上，且必须 32×32 全空、不与别的坦克重叠，
+   否则挪进墙里等于换个地方继续卡。 */
+function relocateTank(t) {
+  if (!t || !t.alive) return false;
+  var best = null, bestD = Infinity;
+  for (var gy = 1; gy < G - 1; gy++) {
+    for (var gx = 1; gx < G - 1; gx++) {
+      var px = gx * CS, py = gy * CS;
+      if (px + 32 > W || py + 32 > H) continue;
+      if (tankBlocked(px, py, t.isPlayer)) continue;
+      if (tanksOverlap(px, py, t)) continue;
+      var d = Math.abs(px - t.x) + Math.abs(py - t.y);
+      if (d < bestD) { bestD = d; best = { x: px, y: py }; }
+    }
+  }
+  if (!best) return false;
+  t.x = best.x;
+  t.y = best.y;
+  t.standStill = 0;
+  t.aiDirTimer = 0;
+  t.dir = (Math.random() * 4) | 0;
+  return true;
+}
+
+/* --------------------------- 坦克工厂 ----------------------------------- */
+function makeTank(kind, gx, gy, dir, isPlayer) {
+  var k = TANK_KIND[kind];
+  return {
+    kind: kind, isPlayer: !!isPlayer,
+    x: gx, y: gy, dir: dir || 2,     // 0上 1右 2下 3左
+    hp: k.hp, maxHp: k.hp,
+    speed: k.speed, alive: true,
+    cooldown: 0, spawnAnim: 60,
+    bob: 0, hurtFlash: 0,
+    aiTimer: 0, aiDirTimer: 0
+  };
+}
+
+/* 玩家出生点：左下角（经典位置）。
+   绝不能放在 (0,0) —— 那里是敌军出生点之一，
+   敌军一出生就和玩家重叠，玩家会被反复顶死/困住。 */
+var PLAYER_SPAWN = { col: 8, row: 24 };
+
+function spawnPlayer() {
+  player = makeTank('player', PLAYER_SPAWN.col * CS, PLAYER_SPAWN.row * CS, 0, true);
+  shieldTimer = 120;   // 出生 2 秒无敌
+}
+
+function spawnEnemy() {
+  if (state.spawnIndex >= TOTAL_PER_STAGE) return;
+  if (enemies.filter(function (e) { return e.alive; }).length >= MAX_ON_FIELD) return;
+  if (state.spawnTimer > 0) return;
+  state.spawnTimer = 90;
+
+  // 收集还没出场的类型
+  var need = [];
+  var roster = STAGE_ROSTER[(state.stage - 1) % STAGE_ROSTER.length];
+  var order = ['basic', 'fast', 'power', 'armor'];
+  var spawnedTotal = state.spawnIndex;
+  // 按编成比例决定这一辆是什么（用已出场计数反推）
+  var counts = state.killedByType;
+  // 简化：按权重轮询决定
+  var pool = [];
+  order.forEach(function (t) { for (var i = 0; i < (roster[t] || 0); i++) pool.push(t); });
+  // pool 长度可能 != 20，用 spawnIndex 取模兜底
+  var kind = pool.length ? pool[spawnedTotal % pool.length] : 'basic';
+  if (spawnedTotal < 4) kind = 'basic';   // 前 4 辆固定普通，别一上来就装甲
+
+  var spots = [[0, 0], [12, 0], [24, 0]];
+  var used = enemies.filter(function (e) { return e.alive; }).map(function (e) { return e.x + ',' + e.y; });
+  var cand = spots.filter(function (s) { return used.indexOf(s[0] + ',' + s[1]) === -1; });
+  if (!cand.length) cand = spots;
+  var s = cand[(Math.random() * cand.length) | 0];
+
+  var spawnX = s[0] * CS, spawnY = s[1] * CS;
+  // 别跟玩家/别的坦克叠在一起
+  if (tanksOverlap(spawnX, spawnY, null)) return;
+
+  var e = makeTank(kind, spawnX, spawnY, 2, false);
+  e.spawnAnim = 60;
+  enemies.push(e);
+  state.spawnIndex++;
+  updateHUD();
+}
+
+/* --------------------------- 移动 --------------------------------------- */
+/* 把坐标吸附到最近的格边界（16 的倍数）。
+   坦克只在格对齐的轨道上跑，这是经典坦克大战的手感，关键是——
+   不对齐的话，坦克在窄道里会「半格卡住」：任何方向的下一步都压在墙上，
+   一旦卡死就永远出不来（实测第 2/8/10 关会有 1 辆敌军卡在角上，导致关卡无法结束）。 */
+function snap(v, dist) {
+  var target = Math.round(v / CS) * CS;
+  if (Math.abs(target - v) <= dist) return target;
+  return v + (target > v ? dist : -dist);
+}
+
+/* 尝试把坦克沿方向移动 dist 像素，返回是否真的动了 */
+function tryMove(t, dist) {
+  var nx = t.x, ny = t.y;
+  if (t.dir === 0) ny -= dist;
+  else if (t.dir === 1) nx += dist;
+  else if (t.dir === 2) ny += dist;
+  else nx -= dist;
+
+  var blocked = false;
+
+  if (nx !== t.x) {
+    /* 横向移动：先把纵向吸附到轨道，避免卡在两道砖的缝隙里 */
+    var alignedY = snap(t.y, dist);
+    if (alignedY !== t.y && !tankBlocked(nx, alignedY, t.isPlayer) && !tanksOverlap(nx, alignedY, t)) {
+      t.y = alignedY;
+    } else if (alignedY !== t.y) {
+      // 吸附方向被挡（说明本来就在墙边），先只走横向
+    }
+    if (tankBlocked(nx, t.y, t.isPlayer) || tanksOverlap(nx, t.y, t)) {
+      blocked = true;
+      // 撞墙时把贴住的那一轴也对齐，防止越贴越歪
+      t.y = snap(t.y, 1);
+    } else { t.x = nx; }
+  } else if (ny !== t.y) {
+    /* 纵向移动：先把横向吸附到轨道 */
+    var alignedX = snap(t.x, dist);
+    if (alignedX !== t.x && !tankBlocked(alignedX, ny, t.isPlayer) && !tanksOverlap(alignedX, ny, t)) {
+      t.x = alignedX;
+    }
+    if (tankBlocked(t.x, ny, t.isPlayer) || tanksOverlap(t.x, ny, t)) {
+      blocked = true;
+      t.x = snap(t.x, 1);
+    } else { t.y = ny; }
+  }
+
+  // 彻底兜底：万一吸附把坦克推进了墙里，退回到最近的合法格
+  if (tankBlocked(t.x, t.y, t.isPlayer)) {
+    t.x = snap(t.x, CS);
+    t.y = snap(t.y, CS);
+    if (tankBlocked(t.x, t.y, t.isPlayer)) {
+      // 实在无解：退回整数格原点，宁可瞬移也不能卡死
+      t.x = Math.round(t.x / CS) * CS;
+      t.y = Math.round(t.y / CS) * CS;
+    }
+  }
+
+  // 冰面滑行判定
+  var onIce = false;
+  var cxx = Math.floor((t.x + 16) / CS), cyy = Math.floor((t.y + 16) / CS);
+  if (cxx >= 0 && cxx < G && cyy >= 0 && cyy < G && grid[cyy][cxx] === ICE) onIce = true;
+
+  return { moved: !blocked, blocked: blocked, onIce: onIce };
+}
+
+/* --------------------------- 子弹 --------------------------------------- */
+function fire(t) {
+  if (t.cooldown > 0) return;
+  t.cooldown = t.isPlayer ? 14 : 70;   // 敌军射速放慢，否则一起压基地太窒息
+  var cx = t.x + 16, cy = t.y + 16;
+  var vx = 0, vy = 0;
+  var off = 18;
+  if (t.dir === 0) { vy = -BULLET_SPEED; cy -= off; }
+  else if (t.dir === 1) { vx = BULLET_SPEED; cx += off; }
+  else if (t.dir === 2) { vy = BULLET_SPEED; cy += off; }
+  else { vx = -BULLET_SPEED; cx -= off; }
+  bullets.push({
+    x: cx, y: cy, vx: vx, vy: vy,
+    owner: t.isPlayer ? 'player' : 'enemy',
+    power: (t.isPlayer && player && player.star >= 3) ? 2 : 1,
+    alive: true
+  });
+  sfxShoot();
+}
+
+/* 子弹撞地形：返回 true 表示子弹消失 */
+function damageTile(tx, ty, power) {
+  if (ty < 0 || ty >= G || tx < 0 || tx >= G) return false;
+  var t = grid[ty][tx];
+  if (t === BRICK) { grid[ty][tx] = EMPTY; return true; }
+  if (t === STEEL) {
+    if (power >= 2) { grid[ty][tx] = EMPTY; return true; }  // 三星炮可破钢
+    return true;   // 普通炮弹打钢墙也会消失
+  }
+  if (t === BASE) {
+    // 开局保护期：敌军刚出场、玩家还没就位时，老巢短暂免疫，
+    // 否则个别地图会被一波 rush 直接偷家（实测第 6 关 1.7 秒失守）
+    if (state.graceTimer > 0) return true;
+    state.baseAlive = false;
+    for (var y = BASE_ROW; y <= BASE_ROW + 1; y++)
+      for (var x = BASE_COL; x <= BASE_COL + 1; x++)
+        grid[y][x] = EMPTY;
+    explode(tx * CS + 8, ty * CS + 8, 34);
+    sfxBoom();
+    endGame(false, '老巢被摧毁');
+    return true;
+  }
+  return false;
+}
+
+/* 砖墙是 2×2 一组，打掉一片更像经典手感 */
+function damageBrickArea(bx, by, power) {
+  var hit = false;
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      var tx = bx + dx, ty = by + dy;
+      if (ty < 0 || ty >= G || tx < 0 || tx >= G) continue;
+      if (grid[ty][tx] === BRICK) {
+        grid[ty][tx] = EMPTY;
+        hit = true;
+      }
+    }
+  }
+  return hit;
+}
+
+/* --------------------------- 爆炸特效 ----------------------------------- */
+function explode(cx, cy, r) {
+  effects.push({ x: cx, y: cy, r: r || 18, t: 0, life: 22 });
+}
+
+/* --------------------------- 道具 --------------------------------------- */
+var POWERUP_KINDS = ['star', 'life', 'bomb', 'shovel', 'helmet', 'clock'];
+function maybeDropPowerup(cx, cy) {
+  // 约 22% 概率，且场上同时只有一个
+  if (powerup || Math.random() > 0.22) return;
+  var kind = POWERUP_KINDS[(Math.random() * POWERUP_KINDS.length) | 0];
+  // 别跟老巢重叠
+  powerup = { kind: kind, x: cx, y: cy, t: 0 };
+}
+
+function applyPowerup(kind) {
+  if (kind === 'star') {
+    player.star = Math.min(3, (player.star || 0) + 1);
+    state.message = player.star >= 3 ? '火力全开！可击穿钢墙' : '火力提升 Lv.' + player.star;
+  } else if (kind === 'life') {
+    state.life++;
+    state.message = '生命 +1';
+  } else if (kind === 'bomb') {
+    // 全屏炸掉所有敌军
+    enemies.forEach(function (e) {
+      if (e.alive) {
+        explode(e.x + 16, e.y + 16, 22);
+        e.alive = false;
+        state.killedByType[e.kind] = (state.killedByType[e.kind] || 0) + 1;
+        state.score += TANK_KIND[e.kind].score;
+      }
+    });
+    state.message = '全屏轰炸！';
+    sfxBoom();
+  } else if (kind === 'shovel') {
+    state.shovelTimer = 900;   // 15 秒钢墙护罩
+    state.message = '老巢钢化 15 秒';
+  } else if (kind === 'helmet') {
+    shieldTimer = 600;         // 10 秒无敌
+    state.message = '无敌 10 秒';
+  } else if (kind === 'clock') {
+    state.freezeTimer = 420;   // 7 秒敌军冻结
+    state.message = '敌军冻结 7 秒';
+  }
+  state.messageTimer = 110;
+  sfxPowerup();
+  updateHUD();
+}
+
+/* 老巢护罩的坐标（双层砖墙）。buildGrid 与 applyShovel 共用同一份，
+   避免两处定义漂移导致「铁锹道具护不住基地」 */
+function baseShieldCells() {
+  var bc = BASE_COL, br = BASE_ROW;
+  return [
+    // 内层（紧贴基地）
+    [bc - 1, br - 1], [bc, br - 1], [bc + 1, br - 1], [bc + 2, br - 1],
+    [bc - 1, br], [bc - 1, br + 1],
+    [bc + 2, br], [bc + 2, br + 1],
+    // 外层（再往外一圈，正上方重点加固）
+    [bc - 2, br - 2], [bc - 1, br - 2], [bc, br - 2], [bc + 1, br - 2], [bc + 2, br - 2], [bc + 3, br - 2],
+    [bc - 2, br - 1], [bc + 3, br - 1],
+    [bc - 2, br], [bc + 3, br],
+    [bc - 2, br + 1], [bc + 3, br + 1]
+  ];
+}
+
+/* 把老巢护罩换成钢墙 / 换回砖墙（铁锹道具） */
+function applyShovel(steel) {
+  var shield = baseShieldCells();
+  for (var i = 0; i < shield.length; i++) {
+    var sx = shield[i][0], sy = shield[i][1];
+    if (sx < 0 || sx >= G || sy < 0 || sy >= G) continue;
+    if (grid[sy][sx] === BASE) continue;
+    if (steel) grid[sy][sx] = STEEL;
+    else if (grid[sy][sx] === STEEL) grid[sy][sx] = BRICK;
+  }
+}
+
+/* --------------------------- 输入 --------------------------------------- */
+var input = { up:false, down:false, left:false, right:false, action:false };
+
+document.addEventListener('keydown', function (e) {
+  var k = e.key;
+  if (k === 'ArrowUp'    || k === 'w' || k === 'W') { input.up = true;    e.preventDefault(); }
+  if (k === 'ArrowDown'  || k === 's' || k === 'S') { input.down = true;  e.preventDefault(); }
+  if (k === 'ArrowLeft'  || k === 'a' || k === 'A') { input.left = true;  e.preventDefault(); }
+  if (k === 'ArrowRight' || k === 'd' || k === 'D') { input.right = true; e.preventDefault(); }
+  if (k === ' ' || k === 'Enter') {
+    input.action = true;
+    if (!state.running || state.over) startOrRestart();
+    e.preventDefault();
+  }
+});
+document.addEventListener('keyup', function (e) {
+  var k = e.key;
+  if (k === 'ArrowUp'    || k === 'w' || k === 'W') input.up = false;
+  if (k === 'ArrowDown'  || k === 's' || k === 'S') input.down = false;
+  if (k === 'ArrowLeft'  || k === 'a' || k === 'A') input.left = false;
+  if (k === 'ArrowRight' || k === 'd' || k === 'D') input.right = false;
+  if (k === ' ' || k === 'Enter') input.action = false;
+});
+
+/* 触屏方向键 */
+(function bindPad() {
+  var pad = document.querySelector('.pad');
+  function setDir(d, on) {
+    if (d === 'up') input.up = on;
+    if (d === 'down') input.down = on;
+    if (d === 'left') input.left = on;
+    if (d === 'right') input.right = on;
+    if (d === 'fire') input.action = on;
+  }
+  ['pointerdown', 'pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+    pad.addEventListener(ev, function (e) {
+      var b = e.target.closest('button[data-dir]');
+      if (!b) return;
+      var on = (ev === 'pointerdown');
+      if (on && (!state.running || state.over)) startOrRestart();
+      setDir(b.getAttribute('data-dir'), on);
+      e.preventDefault();
+    });
+  });
+  // 键盘用户也能用鼠标按住
+  pad.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+})();
+
+/* 画布点按也能开炮（方便桌面鼠标玩家） */
+cv.addEventListener('pointerdown', function (e) {
+  if (!state.running || state.over) { startOrRestart(); return; }
+  input.action = true;
+});
+cv.addEventListener('pointerup', function () { input.action = false; });
+
+btnStart.addEventListener('click', startOrRestart);
+document.getElementById('btn-restart').addEventListener('click', function () {
+  if (!state.running) { startOrRestart(); return; }
+  startStage(state.stage, true);   // 重打本关
+});
+
+/* --------------------------- 流程控制 ----------------------------------- */
+/* 统一入口：点「开始战斗」或按空格时调用。
+   一局结束时（over/won）→ 从第 1 关、3 条命重开；
+   中途暂停（!running）→ 接着当前关继续。 */
+function startOrRestart() {
+  if (state.over || state.won) {
+    state.stage = 1;
+    state.life = 3;
+    state.score = 0;
+  }
+  if (state.life <= 0) state.life = 3;   // 兜底：生命耗尽后重开必定补满
+  startStage(state.stage, false);
+}
+
+/* 开始某一关。isRetry 为 true 表示「重打本关」：保留当前生命数。
+   生命数**跨关继承**（经典设定），只有开新局时才由 startOrRestart 补满。
+   这里做一次兜底：生命耗尽时不允许开局，避免出现 0 命还能玩的怪状态。 */
+function startStage(stage, isRetry) {
+  if (state.life <= 0) state.life = 3;
+  state.stage = stage;
+  state.running = true;
+  state.over = false;
+  state.won = false;
+  state.spawnIndex = 0;
+  state.spawnTimer = 60;
+  state.killedByType = { basic: 0, fast: 0, power: 0, armor: 0 };
+  state.freezeTimer = 0;
+  state.shovelTimer = 0;
+  state.graceTimer = 420;   // 开局 7 秒内老巢免疫，给玩家就位时间
+  state.baseAlive = true;
+  state.message = '';
+  state.messageTimer = 0;
+
+  enemies = []; bullets = []; effects = []; powerup = null;
+
+  buildGrid(stage);
+  spawnPlayer();
+  btnStart.textContent = '重新开始';
+  updateHUD();
+}
+
+/* 关卡完成 */
+function stageClear() {
+  state.running = false;
+  sfxStageClear();
+  state.message = '';
+  if (state.stage >= 10) {
+    state.won = true;
+    state.over = true;
+    saveBest();
+  } else {
+    state.message = '第 ' + state.stage + ' 关达成！';
+    state.messageTimer = 180;
+    setTimeout(function () {
+      if (!state.over && !state.won) startStage(state.stage + 1, false);
+    }, 1500);
+  }
+}
+
+function endGame(baseLost, reason) {
+  if (state.over) return;
+  state.over = true;
+  state.running = false;
+  state.message = reason || '战斗失败';
+  state.messageTimer = 999999;
+  saveBest();
+  sfxGameOver();
+}
+
+/* 玩家被击中 */
+function playerHit() {
+  if (state.over || !state.running) return;   // 结算后不再扣命
+  if (!player || !player.alive) return;
+  if (shieldTimer > 0) return;                // 重生无敌期间免疫
+  state.life--;
+  explode(player.x + 16, player.y + 16, 26);
+  sfxBoom();
+  if (state.life <= 0) {
+    state.life = 0;
+    player.alive = false;
+    updateHUD();
+    endGame(false, '全军覆没');
+  } else {
+    // 回到出生点重生，享受短暂无敌
+    player.alive = true;
+    shieldTimer = 150;
+    player.star = 0;
+    player.x = PLAYER_SPAWN.col * CS;
+    player.y = PLAYER_SPAWN.row * CS;
+    player.dir = 0;
+    updateHUD();
+  }
+}
+
+/* --------------------------- 更新：玩家 --------------------------------- */
+function updatePlayer() {
+  if (!player || !player.alive) return;
+  if (player.cooldown > 0) player.cooldown--;
+  if (player.bob > 0) player.bob--;
+
+  var mv = 0;
+  if (input.up)    { player.dir = 0; mv = 1; }
+  else if (input.down)  { player.dir = 2; mv = 1; }
+  else if (input.left)  { player.dir = 3; mv = 1; }
+  else if (input.right) { player.dir = 1; mv = 1; }
+
+  if (mv) {
+    var r = tryMove(player, player.speed);
+    if (r.onIce && r.moved) {
+      // 冰面：再滑一小段，形成漂移手感
+      tryMove(player, player.speed * 0.55);
+    }
+  }
+
+  if (input.action) fire(player);
+}
+
+/* --------------------------- 更新：敌军 AI ------------------------------ */
+function updateEnemies() {
+  var frozen = state.freezeTimer > 0;
+
+  for (var i = 0; i < enemies.length; i++) {
+    var e = enemies[i];
+    if (!e.alive) continue;
+    if (e.cooldown > 0) e.cooldown--;
+    if (e.hurtFlash > 0) e.hurtFlash--;
+    if (e.spawnAnim > 0) { e.spawnAnim--; continue; }   // 出生动画期间不动
+
+    if (frozen) continue;
+
+    e.bob = (e.bob + 1) % 40;
+
+    /* --- 方向决策：追击玩家 / 靠近老巢 / 漫游 --- */
+    e.aiDirTimer--;
+    if (e.aiDirTimer <= 0) {
+      e.aiDirTimer = 34 + ((Math.random() * 56) | 0);
+      var r = Math.random();
+      // 只有一部分敌军专职打老巢，其余更倾向于游走和追玩家，
+      // 否则 3 辆同时压基地，玩家根本来不及救（实测基地 8 秒就没了）。
+      // 另外：每关开头几辆不派「拆家型」，给玩家喘息和布防的时间。
+      var warmup = state.spawnIndex <= 4;
+      var baseSeeker = !warmup && (e.kind === 'power' || e.kind === 'armor');
+      if (r < (baseSeeker ? 0.45 : 0.18)) {
+        // 朝老巢方向走
+        var bx = BASE_COL * CS, by = BASE_ROW * CS;
+        var prefer;
+        if (Math.abs(e.x - bx) > Math.abs(e.y - by)) prefer = (bx > e.x) ? 1 : 3;
+        else prefer = (by > e.y) ? 2 : 0;
+        // 偶尔换另一个轴
+        if (Math.random() < 0.35) {
+          prefer = (prefer + (Math.random() < 0.5 ? 1 : 3)) % 4;
+        }
+        e.dir = prefer;
+      } else if (r < 0.75 && player && player.alive) {
+        // 朝玩家
+        var dx = player.x - e.x, dy = player.y - e.y;
+        e.dir = (Math.abs(dx) > Math.abs(dy)) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+      } else {
+        e.dir = (Math.random() * 4) | 0;
+      }
+    }
+
+    /* --- 移动 --- */
+    var prevX = e.x, prevY = e.y;
+    var res = tryMove(e, e.speed);
+    if (res.blocked) {
+      // 被挡住就立刻换方向，避免顶着墙发呆
+      e.aiDirTimer = 0;
+      e.dir = (Math.random() * 4) | 0;
+      var moved2 = tryMove(e, e.speed);
+      // 换个方向还是走不动 → 真卡住了，强制挪到最近空地（防死锁）
+      if (moved2.blocked && !relocateTank(e)) continue;
+    }
+    // 位置几乎没变也算卡住，累计到阈值就强制挪窝（约 3 秒完全没动）
+    if (Math.abs(e.x - prevX) < 0.01 && Math.abs(e.y - prevY) < 0.01) {
+      e.standStill = (e.standStill || 0) + 1;
+      if (e.standStill > 180) {
+        if (relocateTank(e)) e.standStill = 0;
+        else continue;
+      }
+    } else {
+      e.standStill = 0;
+    }
+    if (res.onIce && res.moved) tryMove(e, e.speed * 0.5);
+
+    /* --- 开火：对准玩家或老巢才打，且加冷却，避免火力过密 --- */
+    var wantFire = Math.random() < 0.012;
+    // 正对玩家就开火
+    if (player && player.alive) {
+      if (e.dir === 0 && player.y < e.y && Math.abs(player.x - e.x) < 20) wantFire = true;
+      if (e.dir === 2 && player.y > e.y && Math.abs(player.x - e.x) < 20) wantFire = true;
+      if (e.dir === 3 && player.x < e.x && Math.abs(player.y - e.y) < 20) wantFire = true;
+      if (e.dir === 1 && player.x > e.x && Math.abs(player.y - e.y) < 20) wantFire = true;
+    }
+    // 只有「拆家型」敌军才会主动打老巢（且开局几辆不打），必须真的对准
+    if (!state.graceTimer && e.kind !== 'basic' && e.kind !== 'fast') {
+      var bx2 = BASE_COL * CS, by2 = BASE_ROW * CS;
+      if (e.dir === 0 && by2 < e.y && Math.abs(bx2 + 16 - (e.x + 16)) < 20) wantFire = true;
+      if (e.dir === 2 && by2 > e.y && Math.abs(bx2 + 16 - (e.x + 16)) < 20) wantFire = true;
+      if (e.dir === 3 && bx2 < e.x && Math.abs(by2 + 16 - (e.y + 16)) < 16) wantFire = true;
+      if (e.dir === 1 && bx2 > e.x && Math.abs(by2 + 16 - (e.y + 16)) < 16) wantFire = true;
+    }
+
+    if (wantFire) fire(e);
+  }
+}
+
+/* --------------------------- 更新：子弹 --------------------------------- */
+function updateBullets() {
+  for (var i = bullets.length - 1; i >= 0; i--) {
+    var b = bullets[i];
+    if (!b.alive) { bullets.splice(i, 1); continue; }
+
+    // 分步推进，避免高速穿墙
+    var steps = 4;
+    var sx = b.vx / steps, sy = b.vy / steps;
+    for (var s = 0; s < steps && b.alive; s++) {
+      b.x += sx; b.y += sy;
+
+      if (b.x < 0 || b.x > W || b.y < 0 || b.y > H) { b.alive = false; break; }
+
+      // 地形
+      var tx = Math.floor(b.x / CS), ty = Math.floor(b.y / CS);
+      if (tx >= 0 && tx < G && ty >= 0 && ty < G) {
+        var t = grid[ty][tx];
+        if (t === BRICK) {
+          // 打掉一小片砖，更像经典
+          damageBrickArea(tx, ty, b.power);
+          b.alive = false; sfxHitWall();
+          explode(b.x, b.y, 10);
+          break;
+        } else if (t === STEEL) {
+          if (b.power >= 2) { grid[ty][tx] = EMPTY; explode(b.x, b.y, 12); }
+          else { sfxHitWall(); explode(b.x, b.y, 8); }
+          b.alive = false; break;
+        } else if (t === BASE) {
+          damageTile(tx, ty, 9);
+          b.alive = false; break;
+        }
+      }
+
+      // 命中坦克
+      if (b.owner === 'player') {
+        for (var j = 0; j < enemies.length; j++) {
+          var e = enemies[j];
+          if (!e.alive || e.spawnAnim > 0) continue;
+          if (b.x > e.x && b.x < e.x + 32 && b.y > e.y && b.y < e.y + 32) {
+            b.alive = false;
+            e.hp--;
+            e.hurtFlash = 8;
+            if (e.hp <= 0) {
+              e.alive = false;
+              explode(e.x + 16, e.y + 16, 24);
+              sfxBoom();
+              state.score += TANK_KIND[e.kind].score;
+              state.killedByType[e.kind] = (state.killedByType[e.kind] || 0) + 1;
+              maybeDropPowerup(e.x, e.y);
+              updateHUD();
+            } else {
+              explode(b.x, b.y, 10);
+              sfxHitWall();
+            }
+            break;
+          }
+        }
+      } else {
+        // 敌军子弹
+        if (player && player.alive && shieldTimer <= 0) {
+          if (b.x > player.x && b.x < player.x + 32 && b.y > player.y && b.y < player.y + 32) {
+            b.alive = false;
+            playerHit();
+            break;
+          }
+        }
+        // 敌军子弹可以打掉玩家的子弹
+        for (var m = 0; m < bullets.length; m++) {
+          var ob = bullets[m];
+          if (ob === b || !ob.alive || ob.owner !== 'player') continue;
+          if (Math.abs(ob.x - b.x) < 8 && Math.abs(ob.y - b.y) < 8) {
+            ob.alive = false; b.alive = false;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!b.alive) bullets.splice(i, 1);
+  }
+}
+
+/* --------------------------- 更新：道具拾取 ----------------------------- */
+function updatePowerup() {
+  if (!powerup) return;
+  powerup.t++;
+  if (!player || !player.alive) return;
+  if (powerup.x < player.x + 32 && powerup.x + 32 > player.x &&
+      powerup.y < player.y + 32 && powerup.y + 32 > player.y) {
+    applyPowerup(powerup.kind);
+    powerup = null;
+  }
+}
+
+/* --------------------------- 更新：特效 --------------------------------- */
+function updateEffects() {
+  for (var i = effects.length - 1; i >= 0; i--) {
+    var f = effects[i];
+    f.t++;
+    if (f.t >= f.life) effects.splice(i, 1);
+  }
+}
+
+/* --------------------------- 主更新 ------------------------------------- */
+function update() {
+  if (!state.running) { updateEffects(); return; }
+  state.frame++;
+
+  if (state.freezeTimer > 0) state.freezeTimer--;
+  if (state.graceTimer > 0) state.graceTimer--;
+  if (state.shovelTimer > 0) {
+    state.shovelTimer--;
+    if (state.shovelTimer === 1) applyShovel(false);   // 到期变回砖
+  }
+  if (shieldTimer > 0) shieldTimer--;
+  if (state.messageTimer > 0) state.messageTimer--;
+  if (state.spawnTimer > 0) state.spawnTimer--;
+  if (state.flash > 0) state.flash--;
+
+  updatePlayer();
+  updateEnemies();
+  updateBullets();
+  updatePowerup();
+  updateEffects();
+
+  // 敌军出场
+  if (state.spawnIndex < TOTAL_PER_STAGE) spawnEnemy();
+
+  // 清掉死掉的敌军记录
+  for (var i = enemies.length - 1; i >= 0; i--) {
+    if (!enemies[i].alive && enemies[i].spawnAnim <= 0) enemies.splice(i, 1);
+  }
+
+  // 判断过关：20 辆全部出场且全部阵亡
+  var aliveCount = enemies.filter(function (e) { return e.alive; }).length;
+  var remainingTotal = TOTAL_PER_STAGE - state.spawnIndex + aliveCount;
+  if (!state.over && state.spawnIndex >= TOTAL_PER_STAGE && aliveCount === 0) {
+    stageClear();
+  }
+
+  updateHUD();
+}
+
+/* --------------------------- HUD ---------------------------------------- */
+function updateHUD() {
+  uiStage.textContent = state.stage;
+  uiLife.textContent = Math.max(0, state.life);
+  uiScore.textContent = state.score;
+
+  var alive = enemies.filter(function (e) { return e.alive; }).length;
+  var remain = TOTAL_PER_STAGE - state.spawnIndex + alive;
+  uiEnemy.textContent = remain;
+
+  // 敌军小格子：还没打掉的总数
+  var html = '';
+  for (var i = 0; i < TOTAL_PER_STAGE; i++) {
+    html += '<i class="' + (i < TOTAL_PER_STAGE - remain ? 'dead' : '') + '"></i>';
+  }
+  uiRoster.innerHTML = html;
+}
+
+/* --------------------------- 渲染 --------------------------------------- */
+function drawTile(t, x, y) {
+  var px = x * CS, py = y * CS;
+  if (t === BRICK) {
+    ctx.fillStyle = '#8b3a1f';
+    ctx.fillRect(px, py, CS, CS);
+    ctx.fillStyle = '#c96a3e';
+    ctx.fillRect(px + 1, py + 1, CS - 2, CS / 2 - 2);
+    ctx.fillRect(px + 1, py + CS / 2 + 1, CS - 2, CS / 2 - 2);
+    ctx.fillStyle = 'rgba(0,0,0,.28)';
+    ctx.fillRect(px, py + CS / 2 - 1, CS, 2);
+    ctx.fillRect(px + CS / 2 - 1, py, 2, CS / 2);
+    ctx.fillRect(px, py + CS - 1, CS, 1);
+  } else if (t === STEEL) {
+    ctx.fillStyle = '#7c8aa0';
+    ctx.fillRect(px, py, CS, CS);
+    ctx.fillStyle = '#c3cede';
+    ctx.fillRect(px + 1, py + 1, CS - 3, CS - 3);
+    ctx.fillStyle = '#5b6779';
+    ctx.fillRect(px + 3, py + 3, CS - 7, CS - 7);
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    ctx.fillRect(px + 2, py + 2, 3, 3);
+  } else if (t === WATER) {
+    var wv = Math.sin((state.frame + x * 9 + y * 5) * 0.09) * 1.6;
+    ctx.fillStyle = '#123a63';
+    ctx.fillRect(px, py, CS, CS);
+    ctx.fillStyle = '#1f6ea8';
+    ctx.fillRect(px, py + 2 + wv, CS, CS / 2);
+    ctx.fillStyle = 'rgba(120,200,255,.35)';
+    ctx.fillRect(px + 2, py + 5 + wv, CS - 5, 1.5);
+    ctx.fillRect(px + 3, py + 10 - wv, CS - 7, 1.5);
+  } else if (t === ICE) {
+    ctx.fillStyle = '#2a4f6e';
+    ctx.fillRect(px, py, CS, CS);
+    ctx.fillStyle = '#9fd8f5';
+    ctx.fillRect(px + 1, py + 1, CS - 2, CS - 2);
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.beginPath();
+    ctx.moveTo(px + 2, py + CS - 3);
+    ctx.lineTo(px + CS - 3, py + 2);
+    ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(255,255,255,.5)';
+    ctx.stroke();
+  } else if (t === BASE) {
+    ctx.fillStyle = '#ffd84d';
+    ctx.fillRect(px, py, CS, CS);
+  }
+}
+
+function drawGrass() {
+  for (var y = 0; y < G; y++) {
+    for (var x = 0; x < G; x++) {
+      if (grid[y][x] === GRASS) {
+        var px = x * CS, py = y * CS;
+        ctx.fillStyle = '#1c5c2e';
+        ctx.fillRect(px, py, CS, CS);
+        ctx.fillStyle = '#2f8c47';
+        ctx.fillRect(px + 1, py + 1, CS - 2, CS - 2);
+        ctx.fillStyle = '#5fd07a';
+        ctx.fillRect(px + 3, py + 3, 2, 2);
+        ctx.fillRect(px + 9, py + 6, 2, 2);
+        ctx.fillRect(px + 5, py + 11, 2, 2);
+      }
+    }
+  }
+}
+
+/* 坦克图形：带履带与炮管 */
+function drawTank(t, isPlayer) {
+  var px = t.x, py = t.y;
+  var cfg = TANK_KIND[t.kind];
+
+  // 出生动画：闪烁的星形守护
+  if (t.spawnAnim > 0) {
+    var k = t.spawnAnim / 60;
+    var rr = 4 + (1 - k) * 14;
+    ctx.save();
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(state.frame * 0.4);
+    ctx.strokeStyle = isPlayer ? '#43e0ff' : '#ff5d73';
+    ctx.lineWidth = 2;
+    for (var a = 0; a < 4; a++) {
+      ctx.beginPath();
+      ctx.arc(px + 16, py + 16, rr, a * Math.PI / 2, a * Math.PI / 2 + Math.PI / 2.6);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  var col = cfg.color;
+  if (t.hurtFlash > 0 && (state.frame % 4 < 2)) col = '#ffffff';
+
+  // 装甲车头顶色按血量变
+  if (t.kind === 'armor') {
+    var hpCol = ['#ff5d73', '#fbbf24', '#43e0ff', '#4ade80'];
+    col = hpCol[Math.max(0, Math.min(3, t.hp - 1))];
+    if (t.hurtFlash > 0 && (state.frame % 4 < 2)) col = '#ffffff';
+  }
+
+  var cx = px + 16, cy = py + 16;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // 阴影
+  ctx.fillStyle = 'rgba(0,0,0,.45)';
+  ctx.fillRect(-15, -15, 30, 30);
+
+  // 履带（上下两条）
+  ctx.fillStyle = '#3a4354';
+  ctx.fillRect(-15, -15, 30, 7);
+  ctx.fillRect(-15, 8, 30, 7);
+  ctx.fillStyle = '#5b6779';
+  for (var i = -14; i < 14; i += 4) {
+    ctx.fillRect(i, -14, 2, 5);
+    ctx.fillRect(i, 9, 2, 5);
+  }
+
+  // 车体
+  ctx.fillStyle = col;
+  ctx.fillRect(-10, -8, 20, 16);
+  ctx.fillStyle = 'rgba(0,0,0,.25)';
+  ctx.fillRect(-10, -8, 20, 3);
+
+  // 炮塔
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.arc(0, 0, 6.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.28)';
+  ctx.beginPath();
+  ctx.arc(-2, -2, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 炮管
+  ctx.fillStyle = '#e8eefc';
+  var d = t.dir;
+  if (d === 0) ctx.fillRect(-2, -17, 4, 12);
+  else if (d === 2) ctx.fillRect(-2, 5, 4, 12);
+  else if (d === 3) ctx.fillRect(-17, -2, 12, 4);
+  else ctx.fillRect(5, -2, 12, 4);
+
+  ctx.restore();
+
+  // 无敌护盾
+  if (isPlayer && shieldTimer > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.55 + 0.35 * Math.sin(state.frame * 0.35);
+    ctx.strokeStyle = '#43e0ff';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#43e0ff';
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawBase() {
+  if (!state.baseAlive) return;
+  var px = BASE_COL * CS, py = BASE_ROW * CS;
+  var size = 32;
+  var cx = px + 16, cy = py + 16;
+  // 底座
+  ctx.fillStyle = '#e8eefc';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 15);
+  ctx.lineTo(cx + 15, cy - 6);
+  ctx.lineTo(cx + 10, cy + 15);
+  ctx.lineTo(cx - 10, cy + 15);
+  ctx.lineTo(cx - 15, cy - 6);
+  ctx.closePath();
+  ctx.fill();
+  // 内部老鹰
+  ctx.fillStyle = state.shovelTimer > 0 ? '#43e0ff' : '#fbbf24';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 8);
+  ctx.lineTo(cx + 6, cy - 1);
+  ctx.lineTo(cx + 3, cy + 9);
+  ctx.lineTo(cx - 3, cy + 9);
+  ctx.lineTo(cx - 6, cy - 1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#7a4a00';
+  ctx.fillRect(cx - 1.5, cy - 4, 3, 10);
+}
+
+function drawBullets() {
+  for (var i = 0; i < bullets.length; i++) {
+    var b = bullets[i];
+    ctx.fillStyle = b.owner === 'player' ? '#fbbf24' : '#ff8fa3';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+function drawPowerup() {
+  if (!powerup) return;
+  var px = powerup.x, py = powerup.y;
+  var pulse = 0.5 + 0.5 * Math.sin(powerup.t * 0.18);
+  ctx.save();
+  // 闪烁底框
+  ctx.globalAlpha = 0.35 + 0.45 * pulse;
+  ctx.fillStyle = '#a855f7';
+  ctx.fillRect(px - 2, py - 2, 36, 36);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = '#e8eefc';
+  ctx.lineWidth = 1.6;
+  ctx.strokeRect(px - 2, py - 2, 36, 36);
+
+  var icon = { star:'★', life:'♥', bomb:'✹', shovel:'⛨', helmet:'⛑', clock:'⏱' }[powerup.kind];
+  ctx.fillStyle = '#0b0e14';
+  ctx.fillRect(px + 1, py + 1, 30, 30);
+  ctx.fillStyle = '#fbbf24';
+  ctx.font = 'bold 19px "Segoe UI",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(icon, px + 16, py + 17);
+  ctx.restore();
+}
+
+function drawEffects() {
+  for (var i = 0; i < effects.length; i++) {
+    var f = effects[i];
+    var k = f.t / f.life;
+    ctx.save();
+    ctx.globalAlpha = 1 - k;
+    ctx.fillStyle = k < 0.4 ? '#fff6d0' : (k < 0.7 ? '#fbbf24' : '#ff5d73');
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r * (0.4 + k * 0.9), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = (1 - k) * 0.6;
+    ctx.fillStyle = '#ff5d73';
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.r * (0.2 + k * 1.6), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function render() {
+  ctx.fillStyle = '#04060c';
+  ctx.fillRect(0, 0, W, H);
+
+  // 棋盘底纹
+  for (var y = 0; y < G; y++) {
+    for (var x = 0; x < G; x++) {
+      if ((x + y) % 2 === 0) {
+        ctx.fillStyle = 'rgba(255,255,255,.012)';
+        ctx.fillRect(x * CS, y * CS, CS, CS);
+      }
+    }
+  }
+
+  // 静态地形（水/冰/砖/钢）
+  for (var ty = 0; ty < G; ty++) {
+    for (var tx = 0; tx < G; tx++) {
+      var t = grid[ty][tx];
+      if (t === BRICK || t === STEEL || t === WATER || t === ICE) drawTile(t, tx, ty);
+    }
+  }
+
+  drawBase();
+  drawPowerup();
+
+  // 坦克
+  for (var i = 0; i < enemies.length; i++) {
+    if (enemies[i].alive) drawTank(enemies[i], false);
+  }
+  if (player && player.alive) drawTank(player, true);
+
+  drawBullets();
+
+  // 草地盖在坦克上（经典里草丛能藏坦克）
+  drawGrass();
+
+  drawEffects();
+
+  // 冻结/无敌提示
+  if (state.freezeTimer > 0) {
+    ctx.fillStyle = 'rgba(67,224,255,.08)';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // 中央消息
+  if (state.messageTimer > 0 && state.message) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.62)';
+    var tw = ctx.measureText(state.message).width;
+    ctx.fillRect(0, H / 2 - 30, W, 58);
+    ctx.fillStyle = '#fbbf24';
+    ctx.font = 'bold 20px "Segoe UI","Microsoft YaHei",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(state.message, W / 2, H / 2 - 2);
+    ctx.restore();
+  }
+
+  // 结束遮罩
+  if (state.over) {
+    ctx.fillStyle = 'rgba(0,0,0,.72)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (state.won) {
+      ctx.fillStyle = '#4ade80';
+      ctx.font = 'bold 30px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.fillText('十关全胜！', W / 2, H / 2 - 46);
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 22px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.fillText('总分 ' + state.score, W / 2, H / 2 - 6);
+      ctx.fillStyle = '#8494b3';
+      ctx.font = '14px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.fillText('你守住了老巢，指挥官。', W / 2, H / 2 + 30);
+    } else {
+      ctx.fillStyle = '#ff5d73';
+      ctx.font = 'bold 30px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.fillText('战斗失败', W / 2, H / 2 - 46);
+      ctx.fillStyle = '#e8eefc';
+      ctx.font = '16px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.fillText(state.message || '老巢陷落', W / 2, H / 2 - 6);
+      ctx.fillStyle = '#8494b3';
+      ctx.font = '14px "Segoe UI","Microsoft YaHei",sans-serif';
+      ctx.fillText('打到第 ' + state.stage + ' 关 · 得分 ' + state.score, W / 2, H / 2 + 26);
+    }
+    ctx.fillStyle = '#43e0ff';
+    ctx.font = 'bold 15px "Segoe UI","Microsoft YaHei",sans-serif';
+    ctx.fillText('按空格或点「重新开始」再来一次', W / 2, H / 2 + 68);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  // 未开始时
+  if (!state.running && !state.over) {
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#43e0ff';
+    ctx.font = 'bold 24px "Segoe UI","Microsoft YaHei",sans-serif';
+    ctx.fillText('准备出击', W / 2, H / 2 - 18);
+    ctx.fillStyle = '#8494b3';
+    ctx.font = '14px "Segoe UI","Microsoft YaHei",sans-serif';
+    ctx.fillText('点击「开始战斗」', W / 2, H / 2 + 20);
+    ctx.textBaseline = 'alphabetic';
+  }
+}
+
+/* --------------------------- 持久化 ------------------------------------- */
+function loadBest() {
+  try { state.best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; }
+  catch (e) { state.best = 0; }
+  uiBest.textContent = state.best;
+}
+function saveBest() {
+  if (state.score > state.best) {
+    state.best = state.score;
+    uiBest.textContent = state.best;
+    try { localStorage.setItem(BEST_KEY, String(state.best)); } catch (e) {}
+  }
+}
+
+/* --------------------------- 主循环 ------------------------------------- */
+var acc = 0, last = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  var dt = now - last; last = now;
+  if (dt > 200) dt = 200;
+  acc += dt;
+  var step = 1000 / FPS, guard = 0;
+  while (acc >= step && guard++ < 5) { update(); acc -= step; }
+  render();
+}
+
+/* --------------------------- 启动 --------------------------------------- */
+loadBest();
+state.life = 3;
+state.stage = 1;
+buildGrid(1);
+spawnPlayer();
+state.running = false;   // 等玩家点开始
+updateHUD();
+requestAnimationFrame(function (t) { last = t; loop(t); });
+</script>
+</body>
+</html>

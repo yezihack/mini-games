@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>光谱守卫 · Spectrum Guard</title>
+<meta name="description" content="纯 Canvas 光学塔防：在基座上建红绿蓝光塔，让两束不同色光在敌人身上交汇混出克制色，守住 15 波 10 种敌人。">
+<meta name="wb-category" content="游戏">
+<meta name="wb-icon" content="🔆">
+<meta name="wb-tags" content="塔防,策略,色彩,Canvas,混合">
+<meta name="wb-order" content="60">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23070812'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle'%3E%F0%9F%94%86%3C/text%3E%3C/svg%3E">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+  body { background:#070812; font-family:"Segoe UI","Microsoft YaHei",sans-serif; color:#dfe6ff; overflow:hidden; height:100vh; display:flex; align-items:center; justify-content:center; }
+  #wrap { position:relative; width:1000px; height:640px; box-shadow:0 0 60px rgba(80,120,255,.15); border:1px solid #1c2340; border-radius:8px; overflow:hidden; }
+  canvas { display:block; background:#070812; cursor:crosshair; }
+  /* ---------- HUD ---------- */
+  #hud { position:absolute; top:0; left:0; right:0; height:44px; display:flex; align-items:center; gap:14px; padding:0 14px;
+         background:linear-gradient(180deg, rgba(10,14,32,.92), rgba(10,14,32,.55)); border-bottom:1px solid #232c52; z-index:5; }
+  .hud-item { font-size:14px; letter-spacing:.5px; display:flex; align-items:center; gap:5px; }
+  .hud-item b { font-size:16px; }
+  .gold { color:#ffd75e; } .lives { color:#ff6b81; } .wave { color:#7ecbff; }
+  .btn { background:linear-gradient(180deg,#26356b,#1a2450); border:1px solid #3b4f9e; color:#dfe6ff; padding:5px 14px; border-radius:5px;
+         font-size:13px; cursor:pointer; transition:.15s; }
+  .btn:hover { background:linear-gradient(180deg,#33468c,#232f66); box-shadow:0 0 10px rgba(90,140,255,.4); }
+  .btn:disabled { opacity:.4; cursor:default; box-shadow:none; }
+  .btn.primary { background:linear-gradient(180deg,#2f7d4f,#1e5536); border-color:#43b06e; }
+  .btn.primary:hover { box-shadow:0 0 12px rgba(80,255,150,.45); }
+  .btn.danger { background:linear-gradient(180deg,#7d2f3d,#551e28); border-color:#b04355; }
+  .spacer { flex:1; }
+  /* ---------- 面板(建塔/升级) ---------- */
+  #panel { position:absolute; z-index:8; background:rgba(12,16,38,.96); border:1px solid #33406f; border-radius:10px; padding:12px;
+           box-shadow:0 6px 30px rgba(0,0,0,.6); display:none; min-width:230px; }
+  #panel h4 { font-size:13px; color:#9fb2ff; margin-bottom:8px; letter-spacing:1px; }
+  .tower-card { display:flex; align-items:center; gap:10px; padding:7px 9px; margin:5px 0; border:1px solid #2a3560; border-radius:7px;
+                cursor:pointer; transition:.12s; background:rgba(20,26,56,.6); }
+  .tower-card:hover { border-color:#5b7bff; background:rgba(35,46,95,.8); transform:translateX(2px); }
+  .tower-card.disabled { opacity:.45; cursor:not-allowed; }
+  .swatch { width:22px; height:22px; border-radius:50%; flex:none; }
+  .tower-card .info { flex:1; font-size:12px; line-height:1.35; }
+  .tower-card .info .nm { font-size:13px; font-weight:bold; }
+  .tower-card .cost { color:#ffd75e; font-size:13px; font-weight:bold; }
+  .mix-demo { font-size:11px; color:#8fa0d8; margin-top:2px; }
+  .panel-row { display:flex; gap:8px; margin-top:6px; }
+  .panel-row .btn { flex:1; }
+  /* ---------- 覆盖层 ---------- */
+  .overlay { position:absolute; inset:0; z-index:20; background:rgba(5,7,18,.88); display:flex; flex-direction:column; align-items:center;
+             justify-content:center; backdrop-filter:blur(4px); }
+  .overlay h1 { font-size:42px; letter-spacing:8px; background:linear-gradient(90deg,#ff5b5b,#ffd75e,#5bff8a,#5bd7ff,#b06bff);
+                -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 0 18px rgba(140,120,255,.6)); margin-bottom:6px; }
+  .overlay h2 { font-size:15px; color:#8fa0d8; font-weight:normal; letter-spacing:3px; margin-bottom:26px; }
+  .level-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:26px; }
+  .level-card { width:150px; padding:14px 10px; border:1px solid #2a3560; border-radius:10px; background:rgba(18,24,52,.8); cursor:pointer;
+                text-align:center; transition:.15s; }
+  .level-card:hover { border-color:#5b7bff; box-shadow:0 0 18px rgba(90,140,255,.35); transform:translateY(-3px); }
+  .level-card .lv-n { font-size:22px; font-weight:bold; color:#7ecbff; }
+  .level-card .lv-name { font-size:13px; margin:6px 0 4px; color:#e6ecff; }
+  .level-card .lv-desc { font-size:11px; color:#7787b8; line-height:1.5; }
+  .help { max-width:640px; font-size:12.5px; color:#9fb2d8; line-height:1.9; background:rgba(16,22,48,.7); border:1px solid #26315c;
+          padding:14px 20px; border-radius:10px; }
+  .help b { color:#e8eeff; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; vertical-align:-1px; margin:0 2px; }
+  #toast { position:absolute; top:56px; left:50%; transform:translateX(-50%); z-index:15; background:rgba(15,20,45,.95); border:1px solid #3b4f9e;
+           padding:8px 20px; border-radius:20px; font-size:13px; display:none; box-shadow:0 0 16px rgba(90,140,255,.35); }
+  .big-msg { font-size:30px; letter-spacing:6px; margin-bottom:10px; }
+  /* ---------- 图鉴 ---------- */
+  .gallery { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin:10px 0; }
+  .gcard { background:rgba(20,26,56,.7); border:1px solid #2a3560; border-radius:8px; padding:8px 4px; text-align:center; }
+  .gcard .ge { font-size:26px; filter:drop-shadow(0 0 6px rgba(140,170,255,.6)); }
+  .gcard .gn { font-size:12px; color:#e6ecff; margin:4px 0 2px; }
+  .gcard .gd { font-size:10.5px; color:#8fa0d8; line-height:1.45; }
+  .help h3 { color:#7ecbff; font-size:14px; margin:12px 0 4px; letter-spacing:1px; }
+  .help::-webkit-scrollbar { width:6px; } .help::-webkit-scrollbar-thumb { background:#33406f; border-radius:3px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="cv" width="1000" height="640"></canvas>
+
+  <div id="hud">
+    <div class="hud-item gold">◈ 金币 <b id="ui-gold">0</b></div>
+    <div class="hud-item lives">♥ 生命 <b id="ui-lives">0</b></div>
+    <div class="hud-item wave">☄ 波次 <b id="ui-wave">-</b></div>
+    <div class="hud-item" style="color:#8fa0d8;font-size:12px" id="ui-enemy">残余敌人: 0</div>
+    <div class="spacer"></div>
+    <button class="btn primary" id="btn-start">开始波次</button>
+    <button class="btn" id="btn-speed">速度 ×1</button>
+    <button class="btn" id="btn-pause">暂停</button>
+    <button class="btn" id="btn-mute">🔊</button>
+    <button class="btn" id="btn-help">📖 说明</button>
+    <button class="btn danger" id="btn-quit">选关</button>
+  </div>
+
+  <div id="panel"></div>
+  <div id="toast"></div>
+
+  <div class="overlay" id="ov-menu">
+    <h1>光谱守卫</h1>
+    <h2>SPECTRUM GUARD · 光色克制塔防</h2>
+    <div class="level-grid" id="level-grid"></div>
+    <div class="help">
+      <b>玩法：</b>在发光基座上建造 <span class="dot" style="background:#ff4040"></span>红 / <span class="dot" style="background:#40ff60"></span>绿 / <span class="dot" style="background:#4060ff"></span>蓝 光塔，光束自动射向范围内敌人。<br>
+      <b>核心机制：</b>两束不同色光在敌人处<b>交汇</b>时，按 HSL 色相环实时混合：<span class="dot" style="background:#ff4040"></span>+<span class="dot" style="background:#40ff60"></span>=<span class="dot" style="background:#ffe040"></span>黄、<span class="dot" style="background:#40ff60"></span>+<span class="dot" style="background:#4060ff"></span>=<span class="dot" style="background:#40ffe0"></span>青、<span class="dot" style="background:#ff4040"></span>+<span class="dot" style="background:#4060ff"></span>=<span class="dot" style="background:#d040ff"></span>紫，三色交汇=<span class="dot" style="background:#ffffff"></span>白。<br>
+      <b>克制：</b>敌人只受对应颜色（单色或混合色）伤害——例如 <span class="dot" style="background:#d040ff"></span>紫晶敌人只怕红+蓝交汇光。让光束在敌人行进路线上<b>交叉</b>，制造正确的克制色！共 15 波、10 种敌人。
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-help" style="display:none">
+    <h1 style="font-size:28px;letter-spacing:4px;margin-bottom:14px">玩法说明</h1>
+    <div class="help" style="max-width:780px;max-height:440px;overflow-y:auto" id="help-body"></div>
+    <button class="btn primary" id="btn-help-close" style="margin-top:16px;padding:8px 34px">明白了，开战！</button>
+  </div>
+
+  <div class="overlay" id="ov-end" style="display:none">
+    <div class="big-msg" id="end-title">胜利</div>
+    <div id="end-sub" style="color:#8fa0d8;margin-bottom:24px"></div>
+    <button class="btn primary" id="btn-again" style="padding:10px 34px;font-size:16px">再来一次</button>
+    <button class="btn" id="btn-tomenu" style="padding:10px 34px;font-size:16px;margin-left:12px">返回选关</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   光谱守卫 Spectrum Guard —— 纯前端 Canvas 塔防
+   核心：RGB 光塔光束在 HSL 空间混合出克制色
+================================================================ */
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+const W = 1000, H = 640, HUD_H = 44;
+const TAU = Math.PI * 2;
+
+/* ---------------- HSL 工具 ---------------- */
+function rgbToHsl(r, g, b) {
+  r/=255; g/=255; b/=255;
+  const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+  const l = (mx+mn)/2; let h=0, s=0;
+  if (mx !== mn) {
+    const d = mx-mn;
+    s = l > 0.5 ? d/(2-mx-mn) : d/(mx+mn);
+    if (mx===r) h = ((g-b)/d + (g<b?6:0));
+    else if (mx===g) h = (b-r)/d + 2;
+    else h = (r-g)/d + 4;
+    h *= 60;
+  }
+  return {h, s, l};
+}
+function hslToRgb(h, s, l) {
+  h = ((h%360)+360)%360;
+  const c = (1-Math.abs(2*l-1))*s, x = c*(1-Math.abs(((h/60)%2)-1)), m = l-c/2;
+  let r,g,b;
+  if (h<60){r=c;g=x;b=0;} else if(h<120){r=x;g=c;b=0;} else if(h<180){r=0;g=c;b=x;}
+  else if(h<240){r=0;g=x;b=c;} else if(h<300){r=x;g=0;b=c;} else {r=c;g=0;b=x;}
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
+const hslCss = (h,s,l,a=1) => `hsla(${((h%360)+360)%360},${s*100}%,${l*100}%,${a})`;
+
+/* 多色在 HSL 空间做矢量混合（色相按圆周向量平均） */
+function mixHSL(cols) {
+  let x=0, y=0, sl=0, ll=0;
+  for (const c of cols) { const r = c.s; x += r*Math.cos(c.h*Math.PI/180); y += r*Math.sin(c.h*Math.PI/180); sl += c.s; ll += c.l; }
+  const n = cols.length, mag = Math.hypot(x,y);
+  if (mag < 1e-4) return {h:0, s:0.12, l:0.94, white:true};   // 三色互补 → 白
+  let h = Math.atan2(y,x)*180/Math.PI; if (h<0) h+=360;
+  return { h, s: Math.min(1, (mag/n)*1.7), l: Math.min(0.9, (ll/n)*1.06) };
+}
+function hueDist(a,b){ let d = Math.abs(((a-b)%360+360)%360); return Math.min(d, 360-d); }
+
+/* ---------------- 光色定义 ---------------- */
+const PRIMS = {
+  R: {h:0,   s:1, l:0.55, name:"红塔", css:"#ff4545", key:"R", emo:"❤️"},
+  G: {h:120, s:1, l:0.55, name:"绿塔", css:"#45ff6a", key:"G", emo:"💚"},
+  B: {h:240, s:1, l:0.60, name:"蓝塔", css:"#4a6aff", key:"B", emo:"💙"},
+};
+const TOWER_COST = 50, MAX_LV = 3;
+
+/* ---------------- 敌人图鉴（10 种） ---------------- */
+const ETYPES = {
+  gray:   {name:"灰垢", emo:"🪨", hue:null, hp:34,  spd:62,  rw:6,  r:11, desc:"受任意伤害"},
+  red:    {name:"赤魂", emo:"🔥", hue:0,   hp:50,  spd:70,  rw:8,  r:11, desc:"只怕红光"},
+  green:  {name:"翠魂", emo:"🐸", hue:120, hp:50,  spd:70,  rw:8,  r:11, desc:"只怕绿光"},
+  blue:   {name:"蓝魂", emo:"💧", hue:240, hp:50,  spd:70,  rw:8,  r:11, desc:"只怕蓝光"},
+  amber:  {name:"金珀", emo:"🪙", hue:60,  hp:85,  spd:58,  rw:13, r:12, mixed:["R","G"], desc:"只怕红+绿=黄"},
+  cyan:   {name:"碧玺", emo:"💎", hue:180, hp:85,  spd:58,  rw:13, r:12, mixed:["G","B"], desc:"只怕绿+蓝=青"},
+  violet: {name:"紫晶", emo:"🔮", hue:300, hp:85,  spd:58,  rw:13, r:12, mixed:["R","B"], desc:"只怕红+蓝=紫"},
+  mist:   {name:"白霭", emo:"☁️", hue:null, hp:110, spd:66, rw:15, r:12, anyMix:true, desc:"只怕交叉混合光"},
+  shadow: {name:"暗影", emo:"🌑", hue:null, hp:130, spd:52, rw:16, r:13, singleAny:true, desc:"只怕单色光,免疫混合"},
+  boss:   {name:"虹冕", emo:"👑", hue:0,   hp:1100,spd:40,  rw:220,r:20, boss:true, desc:"弱点色循环变化"},
+};
+const BOSS_HUE_CYCLE = [0,60,120,180,240,300];
+
+/* ---------------- 关卡（5 个布局） ---------------- */
+const LEVELS = [
+  { name:"晨光平原", desc:"平缓双弯 · 8 基座",
+    path:[[-30,140],[260,140],[260,420],[620,420],[620,140],[1030,140]],
+    slots:[[130,80],[130,220],[370,180],[370,350],[500,500],[760,220],[760,80],[880,300]] },
+  { name:"翡翠回廊", desc:"S 形长廊 · 9 基座",
+    path:[[-30,520],[840,520],[840,330],[160,330],[160,140],[1030,140]],
+    slots:[[300,460],[620,580],[760,440],[620,270],[300,390],[300,210],[60,240],[500,80],[760,80]] },
+  { name:"蓝湾螺旋", desc:"螺旋深入 · 10 基座",
+    path:[[-30,90],[700,90],[700,540],[300,540],[300,240],[520,240],[520,420],[1030,420]],
+    slots:[[140,170],[400,170],[600,170],[820,200],[820,420],[640,480],[400,480],[200,470],[400,320],[60,320]] },
+  { name:"熔岩岔口", desc:"交叉火网 · 10 基座",
+    path:[[-30,320],[400,320],[400,90],[1030,90]],
+    path2:[[-30,560],[600,560],[600,320]],
+    slots:[[140,240],[140,400],[280,320],[400,200],[540,90],[540,240],[680,140],[760,320],[680,480],[860,560]] },
+  { name:"光谱王座", desc:"九曲长河 · 12 基座",
+    path:[[-30,80],[900,80],[900,200],[100,200],[100,320],[900,320],[900,440],[100,440],[100,560],[1030,560]],
+    slots:[[200,140],[500,140],[800,140],[500,260],[200,260],[800,260],[200,380],[500,380],[800,380],[500,500],[200,500],[800,500]] },
+];
+const WAVES = 15;
+
+/* ---------------- 全局状态 ---------------- */
+let state = "menu";        // menu | playing | over | victory
+let levelIdx = 0, level = null;
+let gold = 140, lives = 20, wave = 0;
+let enemies = [], towers = [], beams = [], orbs = [], parts = [], floaters = [];
+let spawnQueue = [], spawning = false, betweenWaves = true, waveTimer = 0;
+let speed = 1, paused = false, muted = false;
+let hoverSlot = -1, selected = null;   // selected = {kind:'slot'|'tower', i}
+let shake = 0, time = 0;
+let stars = [];
+
+/* ---------------- 音效 ---------------- */
+let AC = null;
+function beep(freq, dur, type="sine", vol=0.08, slide=0) {
+  if (muted) return;
+  try {
+    if (!AC) AC = new (window.AudioContext||window.webkitAudioContext)();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = freq;
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide), AC.currentTime+dur);
+    g.gain.setValueAtTime(vol, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime+dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime+dur);
+  } catch(e){}
+}
+
+/* ---------------- 波次生成 ---------------- */
+function buildWave(w) {
+  const q = []; let t = 0.5;
+  const push = (type, n, gap) => { for (let i=0;i<n;i++){ q.push({t, type}); t += gap; } };
+  const hpMul = 1 + (w-1)*0.16 + levelIdx*0.35;
+  if (w===1)  push("gray", 8, 0.9);
+  else if (w===2){ push("gray",6,0.7); push("red",5,0.8); }
+  else if (w===3){ push("red",5,0.6); push("green",5,0.6); push("gray",4,0.4); }
+  else if (w===4){ push("blue",6,0.6); push("red",4,0.5); push("green",4,0.5); }
+  else if (w===5){ push("amber",6,0.9); push("red",6,0.4); }
+  else if (w===6){ push("amber",5,0.8); push("cyan",5,0.8); push("gray",6,0.35); }
+  else if (w===7){ push("violet",6,0.8); push("cyan",4,0.6); push("amber",4,0.6); }
+  else if (w===8){ push("mist",6,1.0); push("shadow",3,1.2); push("gray",6,0.3); }
+  else if (w===9){ push("shadow",6,0.9); push("violet",5,0.6); push("amber",5,0.6); }
+  else if (w===10){ push("mist",6,0.8); push("cyan",6,0.6); push("red",6,0.4); }
+  else if (w===11){ push("amber",7,0.7); push("cyan",7,0.7); push("violet",7,0.7); }
+  else if (w===12){ push("shadow",8,0.8); push("mist",6,0.8); push("boss",1,2); t+=3; push("gray",8,0.3); }
+  else if (w===13){ push("red",8,0.4); push("green",8,0.4); push("blue",8,0.4); push("mist",5,0.7); }
+  else if (w===14){ push("amber",8,0.6); push("cyan",8,0.6); push("violet",8,0.6); push("shadow",6,0.7); }
+  else { push("mist",6,0.7); push("shadow",6,0.8); push("boss",1,2); t+=4; push("amber",8,0.5); push("cyan",8,0.5); push("violet",8,0.5); }
+  return { q, hpMul };
+}
+
+/* ---------------- 敌人生成 ---------------- */
+function spawnEnemy(type, hpMul) {
+  const d = ETYPES[type];
+  const path = (type==="boss" && level.path2) ? level.path2 : level.path;
+  enemies.push({
+    type, def:d, path, wp:0,
+    x:path[0][0], y:path[0][1],
+    hp: d.hp*hpMul, maxhp: d.hp*hpMul,
+    spd: d.spd*(0.95+Math.random()*0.1),
+    r: d.r, prog: 0, slow:0, hitFlash:0,
+    hue: d.hue, hueIdx: 0, hueTimer: 0,
+    wob: Math.random()*TAU,
+  });
+}
+
+/* ---------------- 伤害判定 ---------------- */
+function matchColor(def, col) {
+  // col: {h,s,l, single, mixed}
+  if (def.boss)   return hueDist(col.h, col._enemyHue) <= 24 && col.s > 0.3;
+  if (def.anyMix) return col.mixed;
+  if (def.singleAny) return col.single;
+  if (def.hue === null || def.hue === undefined) return true; // gray
+  return hueDist(col.h, def.hue) <= 24 && col.s > 0.3;
+}
+
+/* 点→线段距离 */
+function segDist(px,py,x1,y1,x2,y2){
+  const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy;
+  let t = L2 ? ((px-x1)*dx+(py-y1)*dy)/L2 : 0; t = Math.max(0,Math.min(1,t));
+  return Math.hypot(px-(x1+dx*t), py-(y1+dy*t));
+}
+/* 线段交点 */
+function segInt(a,b){
+  const r={x:a.x2-a.x1,y:a.y2-a.y1}, s={x:b.x2-b.x1,y:b.y2-b.y1};
+  const den = r.x*s.y - r.y*s.x;
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((b.x1-a.x1)*s.y - (b.y1-a.y1)*s.x)/den;
+  const u = ((b.x1-a.x1)*r.y - (b.y1-a.y1)*r.x)/den;
+  if (t<0||t>1||u<0||u>1) return null;
+  return {x:a.x1+r.x*t, y:a.y1+r.y*t};
+}
+
+/* ---------------- 游戏流程 ---------------- */
+function startLevel(i) {
+  levelIdx = i; level = LEVELS[i];
+  gold = 140; lives = 20; wave = 0;
+  enemies = []; towers = []; beams = []; orbs = []; parts = []; floaters = [];
+  spawnQueue = []; spawning = false; betweenWaves = true; waveTimer = 0;
+  selected = null; hoverSlot = -1; speed = 1; paused = false;
+  document.getElementById("btn-speed").textContent = "速度 ×1";
+  document.getElementById("btn-pause").textContent = "暂停";
+  state = "playing";
+  document.getElementById("ov-menu").style.display = "none";
+  document.getElementById("ov-end").style.display = "none";
+  hidePanel();
+  toast(`第 ${i+1} 关 · ${level.name} —— 点击发光基座建塔`);
+  beep(440,0.15,"triangle",0.08,220);
+  // 星空
+  stars = [];
+  for (let k=0;k<90;k++) stars.push({x:Math.random()*W, y:Math.random()*H, r:Math.random()*1.4+0.3, tw:Math.random()*TAU});
+}
+
+function startWave() {
+  if (spawning || !betweenWaves || state!=="playing") return;
+  wave++;
+  const bw = buildWave(wave);
+  spawnQueue = bw.q; waveHpMul = bw.hpMul;
+  spawnClock = 0; spawning = true; betweenWaves = false;
+  toast(`第 ${wave} / ${WAVES} 波来袭！`);
+  beep(220,0.3,"sawtooth",0.06,180);
+}
+let waveHpMul = 1, spawnClock = 0;
+
+function endLevel(win) {
+  state = win ? "victory" : "over";
+  const ov = document.getElementById("ov-end");
+  ov.style.display = "flex";
+  document.getElementById("end-title").textContent = win ? "☀ 光谱稳固" : "✦ 光谱崩解";
+  document.getElementById("end-title").style.color = win ? "#7dffb0" : "#ff7d90";
+  document.getElementById("end-sub").textContent = win
+    ? `你守护了 ${level.name}！剩余生命 ${lives}`
+    : `黑暗吞噬了 ${level.name} ……撑到第 ${wave} 波`;
+  beep(win?523:160, 0.5, win?"triangle":"sawtooth", 0.1, win?260:-80);
+}
+
+/* ---------------- 更新 ---------------- */
+function update(dt) {
+  time += dt;
+  // 出兵
+  if (spawning) {
+    spawnClock += dt;
+    while (spawnQueue.length && spawnQueue[0].t <= spawnClock) {
+      spawnEnemy(spawnQueue.shift().type, waveHpMul);
+    }
+    if (!spawnQueue.length) spawning = false;
+  }
+  // 敌人行进
+  for (let i=enemies.length-1;i>=0;i--) {
+    const e = enemies[i];
+    if (e.def.boss) {
+      e.hueTimer += dt;
+      if (e.hueTimer > 2.5) { e.hueTimer = 0; e.hueIdx = (e.hueIdx+1)%BOSS_HUE_CYCLE.length; beep(660+e.hueIdx*60,0.08,"square",0.05); }
+      e.hue = BOSS_HUE_CYCLE[e.hueIdx];
+    }
+    e.hitFlash = Math.max(0, e.hitFlash - dt*4);
+    const tgt = e.path[e.wp+1];
+    if (!tgt) { // 到达终点
+      enemies.splice(i,1);
+      lives -= e.def.boss ? 5 : 1;
+      shake = 8;
+      beep(120,0.3,"sawtooth",0.1,-60);
+      if (lives <= 0) { lives = 0; endLevel(false); return; }
+      continue;
+    }
+    const dx = tgt[0]-e.x, dy = tgt[1]-e.y, d = Math.hypot(dx,dy);
+    const step = e.spd * dt;
+    e.prog = e.wp + (1 - d/Math.hypot(tgt[0]-e.path[e.wp][0]||1, tgt[1]-e.path[e.wp][1]||1));
+    if (d <= step) { e.x=tgt[0]; e.y=tgt[1]; e.wp++; }
+    else { e.x += dx/d*step; e.y += dy/d*step; e.prog = e.wp + (1 - d/ (Math.hypot(tgt[0]-e.path[e.wp][0], tgt[1]-e.path[e.wp][1])||1)); }
+  }
+  // 塔索敌 + 光束
+  beams = [];
+  for (const tw of towers) {
+    const prim = PRIMS[tw.color];
+    const range = 130 + (tw.lv-1)*20;
+    const dps = 24 * Math.pow(1.85, tw.lv-1);
+    let best = null, bestProg = -1;
+    for (const e of enemies) {
+      const d = Math.hypot(e.x-tw.x, e.y-tw.y);
+      if (d <= range && e.prog > bestProg) { bestProg = e.prog; best = e; }
+    }
+    tw.target = best; tw.range = range;
+    if (best) beams.push({x1:tw.x, y1:tw.y, x2:best.x, y2:best.y, h:prim.h, s:prim.s, l:prim.l, lv:tw.lv, tw});
+  }
+  // 伤害：单色直伤
+  for (const e of enemies) {
+    let dmg = 0, hitCol = null;
+    const near = [];
+    for (const b of beams) {
+      if (segDist(e.x,e.y,b.x1,b.y1,b.x2,b.y2) < e.r + 7) near.push(b);
+    }
+    for (const b of near) {
+      const col = {h:b.h, s:1, l:0.55, single:true};
+      col._enemyHue = e.hue;
+      if (matchColor(e.def, col)) { dmg += 24*0 + (b.tw ? 24*Math.pow(1.85,b.tw.lv-1) : 24); hitCol = col; }
+    }
+    // 混合伤害：不同色光在敌人附近交汇
+    const hues = [...new Set(near.map(b=>b.h))];
+    if (hues.length >= 2) {
+      const mix = mixHSL(hues.map(h=>({h, s:1, l:0.55})));
+      const col = {...mix, mixed:true, single:false}; col._enemyHue = e.hue;
+      if (matchColor(e.def, col)) {
+        let base = 0; for (const b of near) base += 24*Math.pow(1.85,b.tw.lv-1);
+        const tri = hues.length >= 3;
+        dmg += base * (tri ? 0.9 : 0.55);
+        hitCol = col;
+        if (Math.random() < dt*8) addPart(e.x, e.y, mix);
+      }
+    }
+    if (dmg > 0) {
+      e.hp -= dmg * dt;
+      e.hitFlash = 1;
+      if (hitCol) {
+        const rgb = hslToRgb(hitCol.h, hitCol.s, Math.min(0.85, hitCol.l+0.15));
+        e.flashCol = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      }
+    }
+    if (e.hp <= 0) {
+      enemies.splice(enemies.indexOf(e),1);
+      gold += e.def.rw;
+      floaters.push({x:e.x, y:e.y, txt:`+${e.def.rw}`, col:"#ffd75e", life:1});
+      burst(e);
+      beep(500+Math.random()*300, 0.12, "triangle", 0.06, -200);
+    }
+  }
+  // 光束几何交点 → 视觉光球
+  orbs = [];
+  for (let i=0;i<beams.length;i++) for (let j=i+1;j<beams.length;j++) {
+    const a = beams[i], b = beams[j];
+    if (a.h === b.h) continue;
+    const p = segInt(a,b);
+    if (p) {
+      const mix = mixHSL([{h:a.h,s:1,l:0.55},{h:b.h,s:1,l:0.55}]);
+      orbs.push({x:p.x, y:p.y, ...mix, r: 8 + (a.lv+b.lv)*1.5, ph: Math.random()*TAU});
+      if (Math.random() < dt*6) addPart(p.x, p.y, mix);
+    }
+  }
+  // 粒子 & 漂浮字
+  for (let i=parts.length-1;i>=0;i--) { const p=parts[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt*1.6; if(p.life<=0) parts.splice(i,1); }
+  for (let i=floaters.length-1;i>=0;i--) { const f=floaters[i]; f.y-=28*dt; f.life-=dt; if(f.life<=0) floaters.splice(i,1); }
+  shake = Math.max(0, shake - dt*20);
+  // 波次间隙
+  if (!spawning && !betweenWaves && enemies.length===0) {
+    betweenWaves = true; waveTimer = 4;
+    const bonus = 25 + wave*4;
+    gold += bonus;
+    toast(`第 ${wave} 波已净化！奖励 ${bonus} 金币`);
+    beep(523,0.12,"triangle",0.07); setTimeout(()=>beep(659,0.12,"triangle",0.07),120); setTimeout(()=>beep(784,0.2,"triangle",0.07),240);
+  }
+  if (betweenWaves && wave > 0 && wave < WAVES) waveTimer -= dt;
+  if (wave >= WAVES && !spawning && enemies.length===0 && state==="playing") endLevel(true);
+}
+
+/* ---------------- 粒子 ---------------- */
+function addPart(x,y,mix){
+  const rgb = hslToRgb(mix.h, mix.s, Math.min(0.9, mix.l+0.1));
+  parts.push({x, y, vx:(Math.random()-0.5)*60, vy:(Math.random()-0.5)*60, life:0.7+Math.random()*0.4,
+    col:`rgba(${rgb[0]},${rgb[1]},${rgb[2]},`, r:1+Math.random()*2.5});
+}
+function burst(e){
+  const h = e.def.hue !== null && e.def.hue !== undefined ? e.def.hue : 0;
+  const s = e.def.hue !== null && e.def.hue !== undefined ? 0.9 : 0.05;
+  for (let i=0;i<14;i++){
+    const mix = e.def.boss ? {h:Math.random()*360,s:1,l:0.6} : {h, s, l:0.6};
+    addPart(e.x, e.y, mix);
+    const p = parts[parts.length-1];
+    p.vx = Math.cos(i/14*TAU)*(60+Math.random()*80);
+    p.vy = Math.sin(i/14*TAU)*(60+Math.random()*80);
+  }
+}
+
+/* ---------------- 绘制 ---------------- */
+function drawBG(){
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"#0a0d20"); g.addColorStop(0.5,"#0b1026"); g.addColorStop(1,"#0a0d1e");
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  // 星
+  for (const s of stars) {
+    const a = 0.25 + 0.35*Math.sin(time*1.5 + s.tw);
+    ctx.fillStyle = `rgba(180,200,255,${a})`;
+    ctx.fillRect(s.x, s.y, s.r, s.r);
+  }
+  // 微光网格
+  ctx.strokeStyle = "rgba(70,90,180,0.05)"; ctx.lineWidth = 1;
+  for (let x=0;x<W;x+=50){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y=0;y<H;y+=50){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+}
+function drawPaths(){
+  const draw = (path) => {
+    ctx.lineJoin="round"; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(path[0][0], path[0][1]);
+    for (let i=1;i<path.length;i++) ctx.lineTo(path[i][0], path[i][1]);
+    ctx.strokeStyle = "#1a2040"; ctx.lineWidth = 38; ctx.stroke();
+    ctx.strokeStyle = "#232b52"; ctx.lineWidth = 28; ctx.stroke();
+    ctx.setLineDash([6,14]); ctx.strokeStyle = "rgba(120,150,255,0.18)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  draw(level.path);
+  if (level.path2) draw(level.path2);
+}
+function drawSlots(){
+  for (let i=0;i<level.slots.length;i++) {
+    const [x,y] = level.slots[i];
+    const occ = towers.find(t=>t.slot===i);
+    const hov = hoverSlot===i && !occ;
+    ctx.save();
+    ctx.translate(x,y);
+    if (!occ) {
+      ctx.rotate(Math.PI/4);
+      ctx.strokeStyle = hov ? "rgba(140,220,255,0.95)" : "rgba(100,140,255,0.4)";
+      ctx.lineWidth = hov ? 2.5 : 1.5;
+      ctx.shadowColor = hov ? "#6fd7ff" : "#3a5bff"; ctx.shadowBlur = hov ? 18 : 8;
+      const r = hov ? 15 : 13;
+      ctx.strokeRect(-r,-r,r*2,r*2);
+      ctx.rotate(-Math.PI/4);
+      ctx.fillStyle = hov ? "rgba(140,220,255,0.9)" : "rgba(120,150,255,0.45)";
+      ctx.font = "16px sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.fillText("+", 0, 1);
+    }
+    ctx.restore();
+  }
+}
+function drawBeams(){
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const b of beams) {
+    const w = 2.5 + b.lv*1.2;
+    const rgb = hslToRgb(b.h, b.s, b.l+0.05);
+    const flick = 0.85 + 0.15*Math.sin(time*40 + b.h);
+    ctx.shadowColor = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    ctx.shadowBlur = 16;
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.28*flick})`;
+    ctx.lineWidth = w*3.2; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(b.x1,b.y1); ctx.lineTo(b.x2,b.y2); ctx.stroke();
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${0.85*flick})`;
+    ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(b.x1,b.y1); ctx.lineTo(b.x2,b.y2); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,255,${0.75*flick})`;
+    ctx.lineWidth = w*0.35;
+    ctx.beginPath(); ctx.moveTo(b.x1,b.y1); ctx.lineTo(b.x2,b.y2); ctx.stroke();
+    // 炮口光斑
+    ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.9)`;
+    ctx.beginPath(); ctx.arc(b.x1,b.y1, 4+b.lv, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawOrbs(){
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const o of orbs) {
+    const rgb = hslToRgb(o.h, o.s, o.l);
+    const pulse = 1 + 0.25*Math.sin(time*6 + o.ph);
+    const R = o.r * pulse;
+    const g = ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,R*2.6);
+    g.addColorStop(0, `rgba(255,255,255,0.95)`);
+    g.addColorStop(0.25, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.85)`);
+    g.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
+    ctx.shadowColor = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    ctx.shadowBlur = 26;
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(o.x,o.y,R*2.6,0,TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawEnemies(){
+  for (const e of enemies) {
+    const d = e.def;
+    let h = d.hue, s = d.hue!==null&&d.hue!==undefined ? 0.85 : 0.08, l = 0.55;
+    if (d.boss) { h = e.hue; s = 0.95; }
+    if (d.anyMix) { h = 0; s = 0.1; l = 0.85; }
+    if (d.singleAny) { h = 280; s = 0.2; l = 0.12; }
+    const wob = Math.sin(time*3 + e.wob)*1.5;
+    ctx.save();
+    ctx.translate(e.x, e.y + wob);
+    // 光晕底盘
+    ctx.shadowColor = hslCss(h, s, l+0.1);
+    ctx.shadowBlur = 18;
+    const grd = ctx.createRadialGradient(0,0,1,0,0,e.r+4);
+    if (d.singleAny) { grd.addColorStop(0,"rgba(90,55,125,0.9)"); grd.addColorStop(1,"rgba(18,10,28,0.15)"); }
+    else if (d.anyMix) { grd.addColorStop(0,"rgba(255,255,255,0.9)"); grd.addColorStop(1,"rgba(200,220,255,0.12)"); }
+    else { grd.addColorStop(0, hslCss(h, s, l+0.25, 0.9)); grd.addColorStop(1, hslCss(h, s, l-0.1, 0.12)); }
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(0,0,e.r+4,0,TAU); ctx.fill();
+    if (e.hitFlash > 0) {
+      ctx.globalAlpha = e.hitFlash*0.6;
+      ctx.fillStyle = e.flashCol || "#fff";
+      ctx.beginPath(); ctx.arc(0,0,e.r+4,0,TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = hslCss(h, s, l+0.25, 0.8); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0,0,e.r+3,0,TAU); ctx.stroke();
+    // 表情本体
+    ctx.font = `${Math.round(e.r*1.75)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(d.emo, 0, 2);
+    // boss 彩虹外环
+    if (d.boss) {
+      for (let k=0;k<12;k++) {
+        ctx.strokeStyle = hslCss(k*30, 1, 0.6, 0.8);
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(0,0,e.r+5, k/12*TAU + time*2, (k+0.6)/12*TAU + time*2); ctx.stroke();
+      }
+      // 当前弱点环
+      ctx.strokeStyle = hslCss(e.hue, 1, 0.65);
+      ctx.lineWidth = 3; ctx.shadowColor = hslCss(e.hue,1,0.65); ctx.shadowBlur = 14;
+      ctx.beginPath(); ctx.arc(0,0,e.r+11, -Math.PI/2, -Math.PI/2 + (1 - e.hueTimer/2.5)*TAU); ctx.stroke();
+    }
+    ctx.restore();
+    // 弱点指示小点
+    const dots = d.boss ? [e.hue] : (d.mixed ? d.mixed.map(k=>PRIMS[k].h) : (d.hue!==null&&d.hue!==undefined ? [d.hue] : []));
+    if (dots.length) {
+      const gap = 7;
+      dots.forEach((hh,idx)=>{
+        const dx = e.x + (idx - (dots.length-1)/2)*gap;
+        ctx.fillStyle = hslCss(hh, 1, 0.6);
+        ctx.shadowColor = hslCss(hh,1,0.6); ctx.shadowBlur = 6;
+        ctx.beginPath(); ctx.arc(dx, e.y + wob - e.r - 9, 2.6, 0, TAU); ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+    }
+    // 血条
+    const bw = e.r*2.2, pct = Math.max(0, e.hp/e.maxhp);
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(e.x-bw/2, e.y - e.r - 6, bw, 3.5);
+    ctx.fillStyle = pct > 0.5 ? "#7dff8a" : pct > 0.25 ? "#ffd75e" : "#ff5b6a";
+    ctx.fillRect(e.x-bw/2, e.y - e.r - 6, bw*pct, 3.5);
+  }
+}
+function drawTowers(){
+  for (const tw of towers) {
+    const p = PRIMS[tw.color];
+    const rgb = hslToRgb(p.h, p.s, p.l);
+    ctx.save();
+    ctx.translate(tw.x, tw.y);
+    // 选中范围
+    if (selected && selected.kind==="tower" && towers[selected.i]===tw) {
+      ctx.strokeStyle = "rgba(150,200,255,0.5)"; ctx.lineWidth = 1.5;
+      ctx.setLineDash([4,6]);
+      ctx.beginPath(); ctx.arc(0,0,tw.range,0,TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // 石质基座
+    ctx.fillStyle = "#1c2450";
+    ctx.strokeStyle = "rgba(120,150,255,0.35)"; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-13,12); ctx.lineTo(13,12); ctx.lineTo(9,19); ctx.lineTo(-9,19);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    // 光环
+    ctx.shadowColor = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.85)`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0,1,14 + 0.6*Math.sin(time*4+p.h),0,TAU); ctx.stroke();
+    // 表情水晶
+    ctx.font = `21px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(p.emo, 0, 1);
+    ctx.shadowBlur = 0;
+    if (tw.target) { // 朝向箭头
+      const a = Math.atan2(tw.target.y-tw.y, tw.target.x-tw.x);
+      ctx.save(); ctx.rotate(a);
+      ctx.fillStyle = hslCss(p.h, p.s, 0.75, 0.9);
+      ctx.beginPath(); ctx.moveTo(20,1); ctx.lineTo(14,-3); ctx.lineTo(14,5); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+    if (tw.lv > 1) {
+      ctx.fillStyle = "#ffd75e"; ctx.font = "9px sans-serif"; ctx.textAlign="center";
+      ctx.fillText("★".repeat(tw.lv), tw.x, tw.y + 26);
+    }
+  }
+}
+function drawParts(){
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const p of parts) {
+    ctx.fillStyle = p.col + (p.life*0.9) + ")";
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r*p.life+0.5, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawFloaters(){
+  ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center";
+  for (const f of floaters) {
+    ctx.globalAlpha = Math.min(1, f.life*1.5);
+    ctx.fillStyle = f.col;
+    ctx.shadowColor = f.col; ctx.shadowBlur = 8;
+    ctx.fillText(f.txt, f.x, f.y);
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+  }
+}
+function drawHUDInfo(){
+  ctx.fillStyle = "rgba(159,178,216,0.85)";
+  ctx.font = "12px sans-serif"; ctx.textAlign = "left";
+  ctx.fillText(`关卡：${level.name}`, 12, H - 12);
+  ctx.textAlign = "right";
+  if (betweenWaves && wave < WAVES && state==="playing") {
+    ctx.fillStyle = "#8fd7ff";
+    ctx.fillText(wave===0 ? "点击「开始波次」迎战" : `下一波 ${Math.max(0,waveTimer).toFixed(1)}s 后可开启`, W-12, H-12);
+  }
+  if (paused) {
+    ctx.fillStyle = "rgba(5,7,18,0.55)"; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle = "#dfe6ff"; ctx.font = "bold 34px sans-serif"; ctx.textAlign="center";
+    ctx.fillText("‖ 已暂停", W/2, H/2);
+  }
+}
+
+/* ---------------- 主循环 ---------------- */
+let last = performance.now();
+function loop(now) {
+  requestAnimationFrame(loop);
+  let dt = Math.min(0.05, (now-last)/1000); last = now;
+  if (state==="playing" && !paused) {
+    update(dt*speed);
+  }
+  if (state==="menu") return;
+  ctx.save();
+  if (shake>0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+  drawBG(); drawPaths(); drawSlots(); drawOrbs(); drawBeams(); drawEnemies(); drawTowers(); drawParts(); drawFloaters();
+  ctx.restore();
+  drawHUDInfo();
+  // HUD 文本
+  document.getElementById("ui-gold").textContent = gold;
+  document.getElementById("ui-lives").textContent = lives;
+  document.getElementById("ui-wave").textContent = wave===0 ? "-" : `${wave}/${WAVES}`;
+  document.getElementById("ui-enemy").textContent = `残余敌人: ${enemies.length + spawnQueue.length}`;
+  const bs = document.getElementById("btn-start");
+  bs.disabled = !(state==="playing" && betweenWaves && !spawning && wave < WAVES);
+  bs.textContent = wave===0 ? "开始波次" : (betweenWaves && wave<WAVES ? `开始第 ${wave+1} 波` : "战斗中…");
+}
+requestAnimationFrame(loop);
+
+/* ---------------- 交互 ---------------- */
+function canvasPos(ev){
+  const r = cv.getBoundingClientRect();
+  return { x:(ev.clientX-r.left)*(W/r.width), y:(ev.clientY-r.top)*(H/r.height) };
+}
+cv.addEventListener("mousemove", ev => {
+  if (state!=="playing") return;
+  const p = canvasPos(ev);
+  hoverSlot = -1;
+  for (let i=0;i<level.slots.length;i++) {
+    const [x,y] = level.slots[i];
+    if (Math.hypot(p.x-x,p.y-y) < 20 && !towers.find(t=>t.slot===i)) { hoverSlot = i; break; }
+  }
+  cv.style.cursor = hoverSlot>=0 ? "pointer" : "crosshair";
+});
+cv.addEventListener("click", ev => {
+  if (state!=="playing" || paused) return;
+  const p = canvasPos(ev);
+  // 点塔 → 升级面板
+  for (let i=0;i<towers.length;i++) {
+    const t = towers[i];
+    if (Math.hypot(p.x-t.x, p.y-t.y) < 20) { showTowerPanel(i, ev); return; }
+  }
+  // 点基座 → 建塔面板
+  for (let i=0;i<level.slots.length;i++) {
+    const [x,y] = level.slots[i];
+    if (Math.hypot(p.x-x,p.y-y) < 20 && !towers.find(t=>t.slot===i)) { showBuildPanel(i, ev); return; }
+  }
+  hidePanel();
+});
+
+const panel = document.getElementById("panel");
+function hidePanel(){ panel.style.display = "none"; selected = null; }
+function placePanel(ev){
+  const r = document.getElementById("wrap").getBoundingClientRect();
+  let x = ev.clientX - r.left + 14, y = ev.clientY - r.top + 8;
+  panel.style.display = "block";
+  x = Math.min(x, 1000 - panel.offsetWidth - 8); y = Math.min(y, 640 - panel.offsetHeight - 8);
+  panel.style.left = Math.max(4,x)+"px"; panel.style.top = Math.max(48,y)+"px";
+}
+function showBuildPanel(slotIdx, ev){
+  selected = {kind:"slot", i:slotIdx};
+  const [x,y] = level.slots[slotIdx];
+  let h = `<h4>建造光塔 · 基座 (${x}, ${y})</h4>`;
+  for (const k of ["R","G","B"]) {
+    const p = PRIMS[k];
+    const pairs = k==="R" ? "+绿=黄 / +蓝=紫" : k==="G" ? "+红=黄 / +蓝=青" : "+红=紫 / +绿=青";
+    h += `<div class="tower-card ${gold<TOWER_COST?"disabled":""}" data-color="${k}">
+      <div class="swatch" style="background:${p.css};box-shadow:0 0 10px ${p.css};display:flex;align-items:center;justify-content:center;font-size:13px">${p.emo}</div>
+      <div class="info"><div class="nm" style="color:${p.css}">${p.name}</div>
+      <div class="mix-demo">伤害单色敌人 · ${pairs}</div></div>
+      <div class="cost">◈${TOWER_COST}</div></div>`;
+  }
+  panel.innerHTML = h;
+  placePanel(ev);
+  panel.querySelectorAll(".tower-card").forEach(card => {
+    card.onclick = () => {
+      const k = card.dataset.color;
+      if (gold < TOWER_COST) { toast("金币不足！"); beep(140,0.15,"square",0.08); return; }
+      gold -= TOWER_COST;
+      towers.push({slot:slotIdx, x, y, color:k, lv:1, target:null, invested:TOWER_COST});
+      toast(`${PRIMS[k].name} 建造完成`);
+      beep(300,0.15,"triangle",0.09,260);
+      hidePanel();
+    };
+  });
+}
+function showTowerPanel(i, ev){
+  selected = {kind:"tower", i};
+  const t = towers[i], p = PRIMS[t.color];
+  const upCost = 45*t.lv;
+  const sellVal = Math.floor(t.invested*0.7);
+  panel.innerHTML = `<h4>${p.emo} ${p.name} · Lv.${t.lv}</h4>
+    <div style="font-size:12px;color:#9fb2d8;line-height:1.7">
+    伤害 ${Math.round(24*Math.pow(1.85,t.lv-1))}/s · 射程 ${130+(t.lv-1)*20}<br>
+    <span style="color:${p.css}">●</span> 克制 ${t.color==="R"?"赤魂 / 金珀(+) / 紫晶(+)":t.color==="G"?"翠魂 / 金珀(+) / 碧玺(+)":"蓝魂 / 碧玺(+) / 紫晶(+)"}
+    <span style="color:#7787b8">（(+) 需与其他光交叉混合）</span></div>
+    <div class="panel-row">
+      <button class="btn primary" id="p-up" ${t.lv>=MAX_LV||gold<upCost?"disabled":""}>${t.lv>=MAX_LV?"已满级":`升级 ◈${upCost}`}</button>
+      <button class="btn danger" id="p-sell">出售 ◈${sellVal}</button>
+    </div>`;
+  placePanel(ev);
+  document.getElementById("p-up").onclick = () => {
+    if (t.lv>=MAX_LV || gold<upCost) return;
+    gold -= upCost; t.lv++; t.invested += upCost;
+    toast(`${p.name} 升至 Lv.${t.lv}！`);
+    beep(500,0.12,"triangle",0.09,300);
+    hidePanel();
+  };
+  document.getElementById("p-sell").onclick = () => {
+    gold += sellVal;
+    towers.splice(i,1);
+    toast(`已出售，返还 ${sellVal} 金币`);
+    hidePanel();
+  };
+}
+
+/* ---------------- 控件 ---------------- */
+document.getElementById("btn-start").onclick = startWave;
+document.getElementById("btn-speed").onclick = function(){ speed = speed===1?2:1; this.textContent = `速度 ×${speed}`; };
+document.getElementById("btn-pause").onclick = function(){ paused=!paused; this.textContent = paused?"继续":"暂停"; };
+document.getElementById("btn-mute").onclick = function(){ muted=!muted; this.textContent = muted?"🔇":"🔊"; };
+document.getElementById("btn-quit").onclick = () => { state="menu"; document.getElementById("ov-menu").style.display="flex"; hidePanel(); };
+document.getElementById("btn-again").onclick = () => startLevel(levelIdx);
+document.getElementById("btn-tomenu").onclick = () => { state="menu"; document.getElementById("ov-end").style.display="none"; document.getElementById("ov-menu").style.display="flex"; };
+
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.style.display="none", 2600);
+}
+
+/* ---------------- 玩法说明 ---------------- */
+(function buildHelp(){
+  const mixRow = (a,b,c,name) => `<span class="dot" style="background:${a}"></span>+<span class="dot" style="background:${b}"></span>=<span class="dot" style="background:${c}"></span><b>${name}</b>`;
+  const cards = Object.values(ETYPES).map(d =>
+    `<div class="gcard"><div class="ge">${d.emo}</div><div class="gn">${d.name}</div><div class="gd">${d.desc}</div></div>`).join("");
+  document.getElementById("help-body").innerHTML = `
+    <h3>◆ 基本操作</h3>
+    ① 点击地图上的发光<b>基座（◇+）</b>建造光塔；② 点击已建的塔可<b>升级 ★ / 出售</b>；③ 点「开始波次」或按<b>空格键</b>开局；④ 敌人抵达终点会扣除生命，守完 ${WAVES} 波即胜利！
+    <h3>◆ 光色混合（核心机制）</h3>
+    光束会自动射向射程内的敌人，<b>两种不同颜色的光在敌人身上交汇</b>才会混合出克制色：<br>
+    ${mixRow('#ff4040','#40ff60','#ffe040','黄 · 克 🪙金珀')}<br>
+    ${mixRow('#40ff60','#4a6aff','#40ffe0','青 · 克 💎碧玺')}<br>
+    ${mixRow('#ff4040','#4a6aff','#d040ff','紫 · 克 🔮紫晶')}<br>
+    三色交汇 = <span class="dot" style="background:#fff"></span><b>白</b>。<br>
+    💡 把塔分散布局在<b>路径交叉口</b>，让两束光在敌人行进路线上交叉，是击败混合色敌人的唯一办法！
+    <h3>◆ 敌人图鉴（10 种）</h3>
+    <div class="gallery">${cards}</div>
+    <h3>◆ 小贴士</h3>
+    · 🌑<b>暗影</b>免疫混合光，只能被单色光束击杀——交叉火力对它无效！<br>
+    · ☁️<b>白霭</b>只吃混合光，单色塔打它不掉血。<br>
+    · 👑<b>虹冕</b>的弱点色每 2.5 秒循环，盯住它头顶的弱点圆点。<br>
+    · 升级塔会大幅提升伤害与射程（Lv.3 射程 170），路口高塔 = 混合光制造机。<br>
+    · 同色的两束光不会混合；需要 ❤️💚💙 中<b>不同</b>的颜色交汇。`;
+})();
+document.getElementById("btn-help").onclick = () => { document.getElementById("ov-help").style.display = "flex"; };
+document.getElementById("btn-help-close").onclick = () => { document.getElementById("ov-help").style.display = "none"; };
+
+/* 快捷键：空格开局 / Esc 关面板 */
+document.addEventListener("keydown", ev => {
+  if (ev.code === "Space") { ev.preventDefault(); if (state === "playing") startWave(); }
+  if (ev.code === "Escape") { hidePanel(); document.getElementById("ov-help").style.display = "none"; }
+});
+
+/* 选关界面 */
+(function(){
+  const grid = document.getElementById("level-grid");
+  LEVELS.forEach((lv,i)=>{
+    const card = document.createElement("div");
+    card.className = "level-card";
+    card.innerHTML = `<div class="lv-n">${["Ⅰ","Ⅱ","Ⅲ","Ⅳ","Ⅴ"][i]}</div>
+      <div class="lv-name">${lv.name}</div><div class="lv-desc">${lv.desc}</div>`;
+    card.onclick = () => startLevel(i);
+    grid.appendChild(card);
+  });
+})();
+</script>
+</body>
+</html>

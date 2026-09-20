@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>完美切割 - Canvas游戏</title>
+<!-- 导航站卡片元信息 -->
+<meta name="description" content="拖拽画线切割多边形，均分图形拿到星级，支持键盘与触屏操作。">
+<meta name="wb-category" content="游戏">
+<meta name="wb-icon" content="✂️">
+<meta name="wb-tags" content="休闲,键盘,触屏,canvas,多边形">
+<meta name="wb-author" content="">
+<meta name="wb-order" content="100">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0e14'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle'%3E%E2%9C%82%EF%B8%8F%3C/text%3E%3C/svg%3E">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui, sans-serif}
+body{background:#111;color:#fff;overflow:hidden;height:100vh}
+#gameCanvas{display:block;background:#181820}
+/* UI移至底部居中 */
+.ui{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:10}
+.info{background:rgba(0,0,0,0.7);padding:14px 20px;border-radius:14px;text-align:center}
+.line{margin:6px 0;font-size:15px}
+.btns{margin-top:10px;display:flex;gap:10px;justify-content:center}
+button{padding:8px 14px;border:0;border-radius:6px;color:#fff;cursor:pointer;font-size:14px}
+#restartBtn{background:#4477dd}
+#nextBtn{background:#28a745;display:none}
+#tip{position:absolute;top:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.7);padding:8px 18px;border-radius:20px}
+/* 新手弹窗 */
+.modal{
+  position:fixed;inset:0;background:rgba(0,0,0,0.75);
+  display:flex;align-items:center;justify-content:center;z-index:99;
+}
+.modal-box{
+  background:#222;padding:24px 28px;border-radius:12px;max-width:420px;
+}
+.modal-box h2{margin-bottom:14px;color:#8cf}
+.modal-box p{line-height:1.6;margin:8px 0;font-size:15px}
+#startGameBtn{margin-top:16px;width:100%;padding:10px;background:#28a745;font-size:16px}
+.hide{display:none !important;}
+</style>
+</head>
+<body>
+<!-- 新手引导弹窗 -->
+<div id="guideModal" class="modal">
+  <div class="modal-box">
+    <h2>🎮 欢迎来到 完美切割</h2>
+    <p>✅ 玩法：按住鼠标拖拽拉出直线，松开完成切割多边形</p>
+    <p>✅ 目标：使用指定刀数，把图形切成面积尽量相等的碎片</p>
+    <p>✅ 颜色提示：绿色=面积接近目标；红色=偏差很大</p>
+    <p>⌨️ 快捷键：R重开本关｜N下一关｜ESC取消画线</p>
+    <p>💡 提示：前几关图形简单，慢慢熟悉手感！</p>
+    <button id="startGameBtn">开始游戏</button>
+  </div>
+</div>
+
+<div class="ui">
+  <div class="info">
+    <div class="line">关卡：<span id="level">1</span> /20｜剩余刀数：<span id="knives">1</span></div>
+    <div class="line">当前星级：<span id="star">☆☆☆</span>｜本关最高：<span id="bestStar">☆☆☆</span></div>
+    <div class="btns">
+      <button id="restartBtn">R 重开本关</button>
+      <button id="nextBtn">N 下一关</button>
+    </div>
+  </div>
+</div>
+<div id="tip">拖拽鼠标拉出切割线 | ESC取消画线</div>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+function resize(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize',resize);
+
+// ========= 向量工具 =========
+const Vec = {
+  sub(a,b){return {x:a.x-b.x,y:a.y-b.y}},
+  add(a,b){return {x:a.x+b.x,y:a.y+b.y}},
+  mul(v,s){return {x:v.x*s,y:v.y*s}},
+  dot(a,b){return a.x*b.x + a.y*b.y},
+  cross(a,b){return a.x*b.y - a.y*b.x},
+  len2(v){return v.x*v.x+v.y*v.y},
+  len(v){return Math.hypot(v.x,v.y)},
+};
+
+// ========= Sutherland-Hodgman 多边形裁剪 =========
+function sutherlandHodgman(poly, p0, p1, keepSide){
+  let out = [];
+  const N = poly.length;
+  for(let i=0;i<N;i++){
+    const cur = poly[i];
+    const prev = poly[(i+N-1)%N];
+    const cpPrev = Vec.cross(Vec.sub(p1,p0), Vec.sub(prev,p0));
+    const cpCur = Vec.cross(Vec.sub(p1,p0), Vec.sub(cur,p0));
+    const prevIn = keepSide ? cpPrev >= 0 : cpPrev < 0;
+    const curIn = keepSide ? cpCur >=0 : cpCur <0;
+    if(curIn){
+      if(!prevIn){
+        const pt = lineIntersect(prev,cur,p0,p1);
+        if(pt) out.push(pt);
+      }
+      out.push(cur);
+    }else{
+      if(prevIn){
+        const pt = lineIntersect(prev,cur,p0,p1);
+        if(pt) out.push(pt);
+      }
+    }
+  }
+  return out;
+}
+function lineIntersect(a1,a2,b1,b2){
+  const d1 = Vec.sub(a2,a1);
+  const d2 = Vec.sub(b2,b1);
+  const den = Vec.cross(d1,d2);
+  if(Math.abs(den) < 1e-8) return null;
+  const t = Vec.cross(Vec.sub(b1,a1), d2)/den;
+  return Vec.add(a1, Vec.mul(d1,t));
+}
+function polygonArea(poly){
+  let s=0;
+  for(let i=0;i<poly.length;i++){
+    const j=(i+1)%poly.length;
+    s += poly[i].x*poly[j].y - poly[j].x*poly[i].y;
+  }
+  return Math.abs(s)/2;
+}
+
+// ========= 粒子系统 =========
+let particles = [];
+class Particle{
+  constructor(x,y,color){
+    this.x=x;this.y=y;
+    this.vx=(Math.random()-0.5)*6;
+    this.vy=(Math.random()-0.5)*6;
+    this.life=1;this.decay=0.015;
+    this.color=color;
+    this.size=Math.random()*4+1;
+  }
+  update(){
+    this.x+=this.vx;
+    this.y+=this.vy;
+    this.life -= this.decay;
+    this.vy +=0.1;
+  }
+  draw(){
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle=this.color;
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha=1;
+  }
+}
+function spawnCutParticles(x,y,col,count=30){
+  for(let i=0;i<count;i++) particles.push(new Particle(x,y,col));
+}
+
+// ========= 关卡定义【难度梯度调整：前6关简单多边形】 =========
+const levels = [];
+const cx = ()=>canvas.width/2;
+const cy = ()=>canvas.height/2;
+(function buildLevels(){
+  for(let lv=1;lv<=20;lv++){
+    const poly = [];
+    let r = 120;
+    let sides;
+    // 难度分级：前6关简单
+    if(lv <=6){
+      sides = 3 + (lv%3);
+      r = 130;
+    }else if(lv <=12){
+      sides = 5 + (lv%4);
+    }else{
+      sides = 6 + (lv%6);
+    }
+    const angStep = Math.PI*2/sides;
+    for(let i=0;i<sides;i++){
+      const ang = i*angStep + lv*0.15;
+      let rr = r;
+      if(lv>6) rr = r*(0.75 + Math.sin(i*2.3+lv)*0.25);
+      poly.push({x:cx()+Math.cos(ang)*rr, y:cy()+Math.sin(ang)*rr});
+    }
+    let cuts;
+    if(lv<=4) cuts=1;
+    else if(lv<=10) cuts=2;
+    else if(lv<=16) cuts=3;
+    else cuts=4;
+    levels.push({poly, cuts});
+  }
+})();
+
+// ========= 本地存储存档（localStorage） =========
+const STORAGE_KEY = "perfectCutSave";
+function loadSave(){
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if(raw) return JSON.parse(raw);
+  // 存档结构：isNewPlayer 标记是否首次游玩，levelStars 每关最高星级
+  return {isNewPlayer:true, levelStars:Array(20).fill("☆☆☆")};
+}
+function saveSave(saveData){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+}
+let gameSave = loadSave();
+
+// ========= 游戏状态 =========
+let state = {
+  levelIdx:0,
+  pieces:[],
+  knivesLeft:1,
+  dragging:false,
+  cutStart:null,
+  cutEnd:null,
+  done:false,
+  stars:"☆☆☆"
+};
+function loadLevel(idx){
+  const lv = levels[idx];
+  state.levelIdx = idx;
+  state.pieces = [JSON.parse(JSON.stringify(lv.poly))];
+  state.knivesLeft = lv.cuts;
+  state.dragging = false;
+  state.cutStart = null;
+  state.cutEnd = null;
+  state.done = false;
+  state.stars = "☆☆☆";
+  particles = [];
+  document.getElementById('nextBtn').style.display='none';
+  updateUI();
+}
+
+function doCut(p0,p1){
+  if(state.knivesLeft<=0) return;
+  const newPieces = [];
+  for(let poly of state.pieces){
+    const left = sutherlandHodgman(poly, p0,p1,true);
+    const right = sutherlandHodgman(poly, p0,p1,false);
+    if(left.length >=3) newPieces.push(left);
+    if(right.length >=3) newPieces.push(right);
+  }
+  if(newPieces.length > state.pieces.length){
+    state.pieces = newPieces;
+    state.knivesLeft--;
+    spawnCutParticles((p0.x+p1.x)/2, (p0.y+p1.y)/2, "#8cf",45);
+  }
+  checkComplete();
+  updateUI();
+}
+
+// 星级判定【新手关卡放宽误差】
+function checkComplete(){
+  if(state.knivesLeft>0) return;
+  const totalArea = state.pieces.reduce((sum,p)=>sum+polygonArea(p),0);
+  const targetArea = totalArea / state.pieces.length;
+  let maxErr = 0;
+  for(let p of state.pieces){
+    const a = polygonArea(p);
+    const err = Math.abs(a-targetArea)/targetArea;
+    maxErr = Math.max(maxErr, err);
+  }
+  state.done = true;
+  // 前6关降低难度，误差阈值放大
+  let star3,star2;
+  if(state.levelIdx <=5){
+    star3=0.12; star2=0.22;
+  }else{
+    star3=0.08; star2=0.18;
+  }
+  if(maxErr < star3) state.stars = "★★★";
+  else if(maxErr < star2) state.stars = "★★☆";
+  else state.stars = "★☆☆";
+
+  // 更新存档：保留最高星级
+  const oldStar = gameSave.levelStars[state.levelIdx];
+  const rank = s=> s==="★★★"?3 : s==="★★☆"?2:1;
+  if(rank(state.stars) > rank(oldStar)){
+    gameSave.levelStars[state.levelIdx] = state.stars;
+    saveSave(gameSave);
+  }
+  document.getElementById('nextBtn').style.display = "block";
+}
+
+function updateUI(){
+  document.getElementById('level').textContent = state.levelIdx+1;
+  document.getElementById('knives').textContent = state.knivesLeft;
+  document.getElementById('star').textContent = state.stars;
+  document.getElementById('bestStar').textContent = gameSave.levelStars[state.levelIdx];
+}
+
+// ========= 鼠标事件 =========
+canvas.addEventListener('mousedown',e=>{
+  if(state.done || state.knivesLeft<=0) return;
+  const rect = canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left,y=e.clientY-rect.top;
+  state.dragging=true;
+  state.cutStart={x,y};
+  state.cutEnd={x,y};
+});
+canvas.addEventListener('mousemove',e=>{
+  if(!state.dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const x=e.clientX-rect.left,y=e.clientY-rect.top;
+  state.cutEnd={x,y};
+});
+canvas.addEventListener('mouseup',()=>{
+  if(!state.dragging) return;
+  state.dragging=false;
+  if(state.cutStart && state.cutEnd){
+    const dx = state.cutEnd.x-state.cutStart.x;
+    const dy = state.cutEnd.y-state.cutStart.y;
+    if(Math.hypot(dx,dy)>20){
+      doCut(state.cutStart, state.cutEnd);
+    }
+  }
+  state.cutStart=null;
+  state.cutEnd=null;
+});
+// 触屏兼容
+canvas.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  const t = e.touches[0];
+  const mouseEvt = new MouseEvent('mousedown',{clientX:t.clientX,clientY:t.clientY});
+  canvas.dispatchEvent(mouseEvt);
+});
+canvas.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  const t = e.touches[0];
+  const mouseEvt = new MouseEvent('mousemove',{clientX:t.clientX,clientY:t.clientY});
+  canvas.dispatchEvent(mouseEvt);
+});
+canvas.addEventListener('touchend',e=>{
+  e.preventDefault();
+  const mouseEvt = new MouseEvent('mouseup',{});
+  canvas.dispatchEvent(mouseEvt);
+});
+
+// ========= 键盘快捷键 =========
+window.addEventListener('keydown',e=>{
+  switch(e.key.toLowerCase()){
+    case "r":
+      loadLevel(state.levelIdx);break;
+    case "n":
+      if(state.done && state.levelIdx+1<levels.length) loadLevel(state.levelIdx+1);break;
+    case "escape":
+      state.dragging = false;
+      state.cutStart=null;state.cutEnd=null;break;
+  }
+})
+
+// 按钮
+document.getElementById('restartBtn').onclick = ()=>loadLevel(state.levelIdx);
+document.getElementById('nextBtn').onclick = ()=>{
+  if(state.levelIdx+1 < levels.length) loadLevel(state.levelIdx+1);
+  else alert("🎉恭喜通关全部20关！");
+};
+// 新手弹窗关闭
+const modal = document.getElementById("guideModal");
+document.getElementById("startGameBtn").onclick = ()=>{
+  modal.classList.add("hide");
+  gameSave.isNewPlayer = false;
+  saveSave(gameSave);
+};
+
+// ========= 渲染循环 =========
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const totalArea = state.pieces.reduce((sum,p)=>sum+polygonArea(p),0);
+  const blockCount = state.pieces.length;
+  const targetA = totalArea / blockCount;
+
+  for(let poly of state.pieces){
+    const ar = polygonArea(poly);
+    const err = Math.abs(ar-targetA)/targetA;
+    const r = Math.min(255, Math.floor(err*400));
+    const g = Math.max(100, 220-Math.floor(err*400));
+    const b = 160;
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.strokeStyle="#fff";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    poly.forEach((v,i)=>{
+      if(i===0) ctx.moveTo(v.x,v.y);
+      else ctx.lineTo(v.x,v.y);
+    });
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    let cxp=0,cyp=0;
+    poly.forEach(p=>{cxp+=p.x;cyp+=p.y});
+    cxp /= poly.length; cyp /= poly.length;
+    const pct = ((ar/totalArea)*100).toFixed(1);
+    ctx.fillStyle="#fff";
+    ctx.font="14px sans-serif";
+    ctx.textAlign="center";
+    ctx.fillText(`${pct}%`, cxp, cyp);
+  }
+  if(state.dragging && state.cutStart && state.cutEnd){
+    ctx.strokeStyle="#8cf";
+    ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(state.cutStart.x,state.cutStart.y);
+    ctx.lineTo(state.cutEnd.x,state.cutEnd.y);
+    ctx.stroke();
+  }
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.update();
+    p.draw();
+    if(p.life <=0) particles.splice(i,1);
+  }
+  requestAnimationFrame(render);
+}
+
+loadLevel(0);
+render();
+</script>
+</body>
+</html>

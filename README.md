@@ -22,8 +22,15 @@
 
 | 游戏 | 说明 |
 |---|---|
+| ⛏️ [方块世界 · Voxel Craft](games/voxel-craft.html) | 纯手写 WebGL 的 3D 方块沙盒：无限程序化地形、挖掘与放置、飞行与重力、第一人称视角，离线可玩 |
 | 🧱 [方块·随机模式](games/block-game.html) | 经典俄罗斯方块，7-bag 随机、幽灵落点、Hold 暂存、踢墙旋转，六套霓虹配色随机换肤 |
-| ⌨️ [打字指法练习](games/typing-game.html) | 练手指记忆的打字游戏，食指起步逐键解锁，连击加成计分 |
+| 🐍 [贪吃蛇 · 霓虹贪吃](games/snake-game.html) | 经典贪吃蛇：霓虹赛道、自动加速，键盘方向键 / WASD 与触屏滑动都能玩，最高分本地保存 |
+| 🏎️ [环轨竞速：重力反转赛车](games/car.html) | 在环形磁轨上飙车：↑↓ 加速减速，空格一键反转重力躲开障碍，与 AI 对手抢位冲线 |
+| 🕯️ [记忆回廊 · 叙事解谜](games/memory-corridor.html) | WASD 探索回廊的叙事解谜，边走边收集记忆碎片，访问顺序会改写剧情，结局由路线决定 |
+| 🎪 [喊声走钢丝](games/roar-balance.html) | 用麦克风音量控制走钢丝小人保持平衡，喊得越大声越偏左；也可用 ← → 键玩 |
+| 🔆 [光谱守卫 · Spectrum Guard](games/spectrum-guard.html) | 纯 Canvas 光学塔防：让两束不同色光在敌人身上交汇混出克制色，守住 15 波 10 种敌人 |
+| ✂️ [完美切割](games/perfect-cutting.html) | 拖拽画线切割多边形，均分图形拿到星级，支持键盘与触屏操作 |
+| ⌨️ [打字指法练习](games/typing-game.html) | 练手指记忆的打字游戏，食指起步逐键解锁 F/J → D/K → S/L → A/;，连击加成计分 |
 
 ---
 
@@ -44,6 +51,10 @@
 - **`<head>` 里要有** `<meta charset="UTF-8">` 和 `<meta name="viewport" ...>`。
 - **单个文件不超过 2MB**，并且 `<title>` 写个有意义的名字。
 
+另外，**文件名统一用小写 kebab-case**（全小写、用连字符分隔），例如
+`my-game.html`、`perfect-cutting.html`。不要用下划线、空格或大写字母 —— 保持目录整洁、
+URL 也不会大小写敏感出问题。
+
 > 想按主题分门别类？在 `games/` 下再建子目录即可，比如 `games/休闲/`、`games/puzzle/`，
 > **目录名会自动变成导航页上的分类名**，不需要改任何配置。
 
@@ -58,6 +69,13 @@
 <meta name="wb-tags"     content="休闲,键盘,触屏">  <!-- 搜索关键词 -->
 <meta name="wb-author"   content="你的GitHub用户名"> <!-- 卡片上署名 -->
 <meta name="wb-order"    content="100">           <!-- 同分类内排序，越小越靠前 -->
+```
+
+**给页面加个 LOGO（浏览器标签页图标）**：用内联 SVG data URI 即可，零依赖、离线也能显示。
+把 `%F0%9F%8E%AE` 换成你自己 emoji 的 UTF-8 百分号编码、`fill=%23...` 换成背景色：
+
+```html
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0e14'/%3E%3Ctext x='50' y='72' font-size='60' text-anchor='middle'%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
 ```
 
 ### 3. 提 Pull Request
@@ -91,8 +109,15 @@
 ├─ files-data.js          # 自动生成的清单，请勿手改
 ├─ games/                 # 👈 游戏都放这里
 │  ├─ _template.html      # 新游戏模板
-│  ├─ block-game.html     # 示例游戏
-│  └─ typing-game.html    # 示例游戏
+│  ├─ voxel-craft.html    # 3D 方块沙盒
+│  ├─ block-game.html     # 俄罗斯方块
+│  ├─ snake-game.html     # 贪吃蛇
+│  ├─ car.html            # 重力反转赛车
+│  ├─ memory-corridor.html# 叙事解谜
+│  ├─ roar-balance.html   # 喊声走钢丝
+│  ├─ spectrum-guard.html # 光学塔防
+│  ├─ perfect-cutting.html# 完美切割
+│  └─ typing-game.html    # 打字指法练习
 ├─ .nojekyll              # 让 Pages 跳过 Jekyll 处理
 └─ LICENSE                # MIT
 ```
