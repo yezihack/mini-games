@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>方块防线 · 等距塔防 | Block Defense</title>
+<!-- ===== 导航站约定标签：新增页面时照抄这一段即可被 index.html 自动收录 ===== -->
+<meta name="description" content="等距视角的方块塔防：你放的每一块既挡路又改变敌人行军路线，把它们引导进炮塔火力网。无尽波次。">
+<meta name="wb-category" content="游戏">
+<meta name="wb-icon" content="🛡️">
+<meta name="wb-tags" content="塔防,策略,等距,方块,无尽,迷宫">
+<meta name="wb-order" content="15">
+<style>
+  :root{
+    --bg:#070a12;
+    --panel:rgba(12,17,28,.78);
+    --panel-brd:rgba(255,255,255,.12);
+    --txt:#e8eefc;
+    --dim:#8494b3;
+    --accent:#43e0ff;
+    --gold:#ffd166;
+    --bad:#ff5c72;
+    --ok:#5ee08a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;background:var(--bg)}
+  body{
+    font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    color:var(--txt);
+    background:
+      radial-gradient(1100px 700px at 50% -12%, rgba(67,224,255,.10), transparent 62%),
+      radial-gradient(900px 620px at 12% 108%, rgba(168,85,247,.12), transparent 60%),
+      var(--bg);
+    user-select:none;
+  }
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #stage{display:block;width:960px;height:700px;max-width:100%;max-height:100%;touch-action:none;cursor:crosshair}
+
+  .card{
+    background:var(--panel);border:1px solid var(--panel-brd);border-radius:12px;
+    padding:9px 12px;backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.45);
+  }
+  .card b{font-weight:600}
+  .dim{color:var(--dim)}
+
+  /* ---------- 左上：核心 / 金币 / 波次 ---------- */
+  #hud{position:fixed;left:14px;top:14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;pointer-events:none;min-width:190px}
+  #hud .row{display:flex;justify-content:space-between;align-items:baseline;gap:14px;line-height:1.5}
+  #hud .row span{color:var(--dim)}
+  #hpBarWrap{margin-top:6px;height:7px;border-radius:4px;background:rgba(255,255,255,.10);overflow:hidden}
+  #hpBar{display:block;height:100%;width:100%;border-radius:4px;background:linear-gradient(90deg,#5ee08a,#43e0ff);transition:width .18s ease-out,background .18s ease-out}
+  #goldV{color:var(--gold)}
+  #bestLine{font-size:11px;color:var(--dim)}
+  #bestV{color:var(--gold)}
+
+  /* ---------- 右上：波次控制 ---------- */
+  #topright{position:fixed;right:14px;top:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-end;z-index:6}
+  button{font:inherit;color:var(--txt);cursor:pointer}
+  .btn{
+    background:var(--panel);border:1px solid var(--panel-brd);border-radius:11px;
+    padding:9px 15px;backdrop-filter:blur(10px);font-size:13px;font-weight:600;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);transition:transform .08s ease-out,border-color .15s,background .15s;
+  }
+  .btn:hover{border-color:rgba(67,224,255,.5)}
+  .btn:active{transform:translateY(1px)}
+  .btn.main{background:linear-gradient(180deg,rgba(67,224,255,.22),rgba(67,224,255,.08));border-color:rgba(67,224,255,.45)}
+  .btn.ghost{font-weight:500;font-size:12px;padding:6px 11px;background:rgba(12,17,28,.6)}
+  .btn[disabled]{opacity:.45;cursor:default;transform:none}
+
+  /* ---------- 底部：建造栏 ---------- */
+  #buildbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px;z-index:6}
+  .bbtn{
+    position:relative;display:flex;align-items:center;gap:8px;
+    background:var(--panel);border:1px solid var(--panel-brd);border-radius:12px;
+    padding:9px 13px;backdrop-filter:blur(10px);box-shadow:0 8px 24px rgba(0,0,0,.42);
+    transition:border-color .15s,background .15s,transform .08s ease-out;
+  }
+  .bbtn:hover{border-color:rgba(255,255,255,.28)}
+  .bbtn:active{transform:translateY(1px)}
+  .bbtn .ico{font-size:16px;line-height:1}
+  .bbtn .tx{display:flex;flex-direction:column;align-items:flex-start;line-height:1.25}
+  .bbtn .tx i{font-style:normal;font-size:12.5px;font-weight:600}
+  .bbtn .tx u{text-decoration:none;font-size:10.5px;color:var(--dim)}
+  .bbtn.on{border-color:var(--accent);background:linear-gradient(180deg,rgba(67,224,255,.20),rgba(67,224,255,.06))}
+  .bbtn.on .tx u{color:#a9e9ff}
+  .bbtn.no{opacity:.45}
+  .bbtn kbd{
+    position:absolute;right:5px;top:4px;font-size:9.5px;color:var(--dim);
+    background:rgba(255,255,255,.08);border-radius:4px;padding:0 4px;font-family:inherit;
+  }
+
+  /* ---------- 提示 / 遮罩 ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(8px);
+    background:rgba(12,17,28,.9);border:1px solid var(--panel-brd);border-radius:10px;
+    padding:7px 15px;font-size:12.5px;opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .2s;backdrop-filter:blur(10px);z-index:8;white-space:nowrap;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  #veil{
+    position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(900px 600px at 50% 40%, rgba(10,16,28,.74), rgba(4,6,12,.94));
+    backdrop-filter:blur(3px);
+  }
+  #veil.hide{display:none}
+  #veil .box{
+    width:min(540px,88vw);background:var(--panel);border:1px solid var(--panel-brd);
+    border-radius:18px;padding:26px 28px 22px;box-shadow:0 30px 80px rgba(0,0,0,.6);
+  }
+  #veil h1{margin:0 0 7px;font-size:23px;letter-spacing:.5px}
+  #veil h1 em{font-style:normal;color:var(--accent)}
+  #veil p{margin:0 0 14px;font-size:13px;line-height:1.75;color:var(--dim)}
+  #veil ul{margin:0 0 16px;padding:0;list-style:none;font-size:12.5px;line-height:1.8}
+  #veil li{display:flex;gap:9px;align-items:flex-start}
+  #veil li em{font-style:normal;flex:0 0 auto}
+  #veil .go{
+    width:100%;padding:12px;border-radius:12px;font-size:14.5px;font-weight:700;
+    background:linear-gradient(180deg,rgba(67,224,255,.30),rgba(67,224,255,.12));
+    border:1px solid rgba(67,224,255,.5);box-shadow:0 10px 30px rgba(67,224,255,.16);
+  }
+  #veil .go:hover{border-color:var(--accent)}
+  #veil .stat{margin-top:12px;font-size:11.5px;color:var(--dim);text-align:center}
+  #veil .stat b{color:var(--gold)}
+
+  @media (max-width:700px){
+    #hud{min-width:0;font-size:11.5px;left:9px;top:9px}
+    #topright{right:9px;top:9px}
+    #buildbar{bottom:9px;gap:6px}
+    .bbtn{padding:7px 9px}
+    .bbtn .tx u{display:none}
+    #toast{bottom:74px}
+    #veil .box{padding:20px;border-radius:14px}
+    #veil h1{font-size:19px}
+    #veil p,#veil ul{font-size:12px}
+  }
+</style>
+</head>
+<body>
+
+<div id="wrap"><canvas id="stage"></canvas></div>
+
+<div id="hud">
+  <div class="card">
+    <div class="row"><span>核心</span><b id="hpV">100</b></div>
+    <div id="hpBarWrap"><i id="hpBar"></i></div>
+  </div>
+  <div class="card">
+    <div class="row"><span>金币</span><b id="goldV">40</b></div>
+    <div class="row"><span>波次</span><b id="waveV">0</b></div>
+    <div id="bestLine">最高 <b id="bestV">0</b> 波</div>
+  </div>
+</div>
+
+<div id="topright">
+  <button class="btn main" id="btnWave">开始第 1 波</button>
+  <button class="btn ghost" id="btnSpeed">速度 ×1</button>
+</div>
+
+<div id="buildbar">
+  <button class="bbtn on" data-mode="wall"><kbd>1</kbd><span class="ico">🧱</span><span class="tx"><i>石墙</i><u id="costWall">5 金</u></span></button>
+  <button class="bbtn" data-mode="tower"><kbd>2</kbd><span class="ico">🏹</span><span class="tx"><i>炮塔</i><u id="costTower">20 金</u></span></button>
+  <button class="bbtn" data-mode="dig"><kbd>3</kbd><span class="ico">✂️</span><span class="tx"><i>拆除</i><u>返还一半</u></span></button>
+</div>
+
+<div id="toast"></div>
+
+<div id="veil">
+  <div class="box">
+    <h1 id="veilTitle">方块<em>防线</em></h1>
+    <p id="veilSub"></p>
+    <ul id="veilList"></ul>
+    <button class="go" id="btnStart">开始防守</button>
+    <div class="stat">历史最高：<b id="veilBest">0</b> 波 · 键盘 <b>1/2/3</b> 切换建造 · <b>空格</b> 提前开波 · <b>右键</b> 快速拆</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ===== LOGIC 核心逻辑（纯数据 + 纯函数，不触碰 DOM / canvas） =====
+ * 本段可被 _block_defense_test.js 整段切片进 Node 沙箱里单独跑。
+ * 硬约束：这里不准出现 document / canvas / Audio / 任何浏览器全局量。 */
+
+/* ---- 棋盘 ---- */
+const GW = 11, GH = 11;                 /* 11×11：奇数才能让核心严格居中对称 */
+const CX = 5, CY = 5;                   /* 核心所在格 */
+const EMPTY = 0, WALL = 1, TOWER = 2, CORE = 3;
+
+const NEI = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+function inBounds(x, y) { return x >= 0 && y >= 0 && x < GW && y < GH; }
+
+/* ---- 数值表 ----
+ * 每条都写 rationale；未经真实 playtest 验证的一律标 [PLACEHOLDER]，
+ * 并在注释里写明验证路径。不允许出现没有理由的数字。 */
+const CFG = {
+  /* 经济 */
+  startGold: 40,                        /* [PLACEHOLDER] 验证：开局能否"有得建"但不"建得满" */
+  killGold: 6,                          /* [PLACEHOLDER] 验证：多杀是否比少漏更划算 */
+  waveGoldBase: 15, waveGoldStep: 5,    /* [PLACEHOLDER] 验证：每波收入曲线 vs 难度曲线 */
+
+  /* 方块：墙 = 1/4 价钱、1.67 倍血 → 它是"拖时间"工具；塔脆 → 逼玩家用墙保护它 */
+  wallCost: 5,   wallHP: 100,
+  towerCost: 20, towerHP: 60,
+  refund: 0.5,                          /* 返还一半：允许纠错，不允许试错套利 */
+
+  /* 炮塔：DPS = 8 / 0.75 ≈ 10.7 */
+  towerDmg: 8, towerCD: 0.75,           /* [PLACEHOLDER] 验证：一座塔几秒点掉第 1 波 30 血的怪 */
+  /* 2.5 格：够不到全场 → 玩家必须主动把敌人"搬"进射程，这就是核心玩法 */
+  towerRange: 2.5,
+
+  /* 核心 */
+  coreHP: 100,                          /* [PLACEHOLDER] 验证：至少扛得住 6 次漏怪 */
+  coreDmg: 15, coreDmgCD: 0.9,          /* 漏一个 ≈ 1/7 血：代价明确但不致命 */
+
+  /* 敌人 */
+  enemyBaseHP: 30, enemyHPStep: 12,     /* [PLACEHOLDER] 验证：第 1 波 3.75 发、第 10 波 12.9 发 */
+  enemySpeed: 1 / 0.9,                  /* 1.11 格/秒：横穿 11 格约 10 秒，够玩家反应 */
+  enemySpeedStep: 0.045, enemySpeedMin: 0.55,
+  enemyDmgBlock: 20,                    /* 20/0.75s ≈ 26.7 DPS：3 秒拆一座炮塔 */
+  enemyAtkCD: 0.75,
+
+  /* 波次 */
+  waveEnemyBase: 3, waveEnemyStep: 0.8, /* [PLACEHOLDER] 验证：第 10 波 11 个是否已让 6 座塔吃紧 */
+  spawnGapBase: 0.9, spawnGapStep: 0.04, spawnGapMin: 0.38,
+  restTime: 6,                          /* 6 秒喘息：够补一格墙，不够重建整条防线 */
+};
+
+/* ---- 运行时状态 ---- */
+let grid = [];        /* grid[y][x] → EMPTY / WALL / TOWER / CORE */
+let hp = [];          /* 方块剩余血量 */
+let dist = [];        /* dist[y][x] → 到核心的最短步数；Infinity = 到不了 */
+let direct = [];      /* direct[y][x] → 朝核心的那一步在 NEI 里的下标，-1 = 无 */
+let near = [];        /* near[y][x] → 走到"能啃到方块"的站位要几步（只在核心被围死时才起作用） */
+let nearDir = [];     /* nearDir[y][x] → 朝最近方块的那一步 */
+let cds = [];         /* 炮塔开火冷却（按格） */
+let enemies = [];
+let fxQueue = [];     /* 逻辑层只投递事件，表现层负责变成粒子 / 音效 */
+
+let coreHP = CFG.coreHP;
+let gold = CFG.startGold;
+let wave = 0;                 /* 当前/上一波编号，0 = 还没开打 */
+let phase = 'menu';           /* menu | ready | wave | rest | over */
+let restTimer = 0;
+let spawnLeft = 0, spawnTimer = 0, spawnGap = 0;
+let runTime = 0;
+let killed = 0;
+let buildMode = 'wall';       /* 玩家操作模式：wall | tower | dig */
+
+function pushFx(kind, a, b, c) {
+  if (fxQueue.length < 240) fxQueue.push({ kind, a, b, c });
+}
+
+/* ---- 生命周期 ---- */
+function resetCooldowns() {
+  cds = Array.from({ length: GH }, () => new Array(GW).fill(0));
+}
+
+function resetGame() {
+  grid = Array.from({ length: GH }, () => new Array(GW).fill(EMPTY));
+  hp = Array.from({ length: GH }, () => new Array(GW).fill(0));
+  grid[CY][CX] = CORE;
+  hp[CY][CX] = 1e9;
+  enemies = [];
+  fxQueue = [];
+  coreHP = CFG.coreHP;
+  gold = CFG.startGold;
+  wave = 0;
+  runTime = 0;
+  killed = 0;
+  restTimer = 0;
+  spawnLeft = 0; spawnTimer = 0; spawnGap = 0;
+  buildMode = 'wall';
+  phase = 'ready';
+  resetCooldowns();
+  computeDist();
+}
+
+/* 核心格不可建造。
+ * 但不禁"把核心围死"——因为围死不算赢：敌人无路可走会改啃方块（见 decideEnemy 的兜底分支）。 */
+function canBuild(x, y) { return inBounds(x, y) && grid[y][x] === EMPTY; }
+function canDig(x, y) { return inBounds(x, y) && (grid[y][x] === WALL || grid[y][x] === TOWER); }
+function costOf(kind) { return kind === 'wall' ? CFG.wallCost : kind === 'tower' ? CFG.towerCost : 0; }
+
+function place(x, y, kind) {
+  if (!canBuild(x, y)) return false;
+  const cost = costOf(kind);
+  if (gold < cost) { pushFx('deny', x, y); return false; }
+  const t = kind === 'tower' ? TOWER : WALL;
+  grid[y][x] = t;
+  hp[y][x] = t === TOWER ? CFG.towerHP : CFG.wallHP;
+  gold -= cost;
+  computeDist();
+  pushFx('place', x, y, t);
+  return true;
+}
+
+function dig(x, y) {
+  if (!canDig(x, y)) return false;
+  const t = grid[y][x];
+  const back = Math.floor((t === TOWER ? CFG.towerCost : CFG.wallCost) * CFG.refund);
+  grid[y][x] = EMPTY;
+  hp[y][x] = 0;
+  gold += back;
+  computeDist();
+  pushFx('dig', x, y, back);
+  return true;
+}
+
+/* 玩家点一格：按当前模式分发。返回短字符串给 UI 做反馈。 */
+function useCell(x, y) {
+  if (!inBounds(x, y)) return 'out';
+  if (buildMode === 'dig') return dig(x, y) ? 'dug' : 'none';
+  if (!canBuild(x, y)) return 'blocked';
+  if (gold < costOf(buildMode)) return 'poor';
+  return place(x, y, buildMode) ? 'built' : 'none';
+}
+
+/* ---- 距离场 ----
+ * 从核心做 BFS，得到每个空格到核心的最少步数。
+ * 这是整个游戏的骨架：敌人走的就是这个场的下坡方向，
+ * 玩家放一块墙 = 局部抬高地势 = 逼敌人绕行。 */
+function computeDist() {
+  dist = Array.from({ length: GH }, () => new Array(GW).fill(Infinity));
+  direct = Array.from({ length: GH }, () => new Array(GW).fill(-1));
+  dist[CY][CX] = 0;
+  const qx = [CX], qy = [CY];
+  let head = 0;
+  while (head < qx.length) {
+    const x = qx[head], y = qy[head]; head++;
+    const d = dist[y][x];
+    for (let i = 0; i < 4; i++) {
+      const nx = x + NEI[i][0], ny = y + NEI[i][1];
+      if (!inBounds(nx, ny)) continue;
+      if (grid[ny][nx] !== EMPTY) continue;      /* 方块与核心都不通行 */
+      if (dist[ny][nx] > d + 1) { dist[ny][nx] = d + 1; qx.push(nx); qy.push(ny); }
+    }
+  }
+  /* 再扫一遍，给每个可达格记下"朝核心的那一步"，供渲染画箭头 */
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      if (dist[y][x] === Infinity || dist[y][x] === 0) continue;
+      for (let i = 0; i < 4; i++) {
+        const nx = x + NEI[i][0], ny = y + NEI[i][1];
+        if (inBounds(nx, ny) && dist[ny][nx] === dist[y][x] - 1) { direct[y][x] = i; break; }
+      }
+    }
+  }
+
+  /* ---- 场 2：核心被围死时的备用导航 ----
+   * 没有这个场，"用墙把核心裹成粽子"就是一个必须堵死的漏洞：
+   * 敌人 dist 全为 Infinity，找不到下坡方向，只能原地站着，波次永远打不完。
+   * near = 走到"某个方块的隔壁"需要几步；值为 0 表示站在这一格就能啃。
+   * 于是围死不再是免死金牌，只是把敌人从"直扑核心"变成"逐个拆你的墙"。 */
+  near = Array.from({ length: GH }, () => new Array(GW).fill(Infinity));
+  nearDir = Array.from({ length: GH }, () => new Array(GW).fill(-1));
+  const q2x = [], q2y = [];
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      if (grid[y][x] !== EMPTY) continue;
+      for (let i = 0; i < 4; i++) {
+        const ax = x + NEI[i][0], ay = y + NEI[i][1];
+        if (inBounds(ax, ay) && grid[ay][ax] !== EMPTY) { near[y][x] = 0; q2x.push(x); q2y.push(y); break; }
+      }
+    }
+  }
+  let h2 = 0;
+  while (h2 < q2x.length) {
+    const x = q2x[h2], y = q2y[h2]; h2++;
+    const d = near[y][x];
+    for (let i = 0; i < 4; i++) {
+      const ax = x + NEI[i][0], ay = y + NEI[i][1];
+      if (!inBounds(ax, ay) || grid[ay][ax] !== EMPTY) continue;
+      if (near[ay][ax] > d + 1) { near[ay][ax] = d + 1; q2x.push(ax); q2y.push(ay); }
+    }
+  }
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      if (near[y][x] === Infinity || near[y][x] === 0) continue;
+      for (let i = 0; i < 4; i++) {
+        const ax = x + NEI[i][0], ay = y + NEI[i][1];
+        if (inBounds(ax, ay) && near[ay][ax] === near[y][x] - 1) { nearDir[y][x] = i; break; }
+      }
+    }
+  }
+}
+
+/* ---- 敌人 ---- */
+function waveEnemyCount(n) { return CFG.waveEnemyBase + Math.floor(n * CFG.waveEnemyStep); }
+function waveEnemyHP(n) { return CFG.enemyBaseHP + (n - 1) * CFG.enemyHPStep; }
+function waveSpeed(n) {
+  return Math.max(CFG.enemySpeedMin, CFG.enemySpeed * (1 - (n - 1) * CFG.enemySpeedStep));
+}
+function waveSpawnGap(n) { return Math.max(CFG.spawnGapMin, CFG.spawnGapBase - n * CFG.spawnGapStep); }
+function waveBonus(n) { return CFG.waveGoldBase + CFG.waveGoldStep * n; }
+
+function edgeSpots() {
+  const out = [];
+  for (let x = 0; x < GW; x++) {
+    if (grid[0][x] === EMPTY) out.push([x, 0]);
+    if (grid[GH - 1][x] === EMPTY) out.push([x, GH - 1]);
+  }
+  for (let y = 0; y < GH; y++) {
+    if (grid[y][0] === EMPTY) out.push([0, y]);
+    if (grid[y][GW - 1] === EMPTY) out.push([GW - 1, y]);
+  }
+  return out;
+}
+
+function spawnEnemy() {
+  let spots = edgeSpots();
+  if (!spots.length) {                       /* 整圈堵死 → 退化成任意空格 */
+    for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (grid[y][x] === EMPTY) spots.push([x, y]);
+  }
+  if (!spots.length) return null;
+  const [x, y] = spots[Math.floor(Math.random() * spots.length)];
+  const ini = waveEnemyHP(wave);
+  const e = {
+    x, y, t: 0, nx: x, ny: y,
+    vx: x, vy: y,                            /* 渲染用：按 t 插值的浮点格坐标 */
+    mhp: ini, chp: ini,
+    spd: waveSpeed(wave), cd: 0,
+    mode: 'move', tx: -1, ty: -1,
+    off: (Math.random() - 0.5) * 0.22,       /* 同格重叠时的视觉错位，纯表现 */
+    born: 0, flash: 0, dead: false,
+  };
+  decideEnemy(e);
+  enemies.push(e);
+  pushFx('spawn', x, y);
+  return e;
+}
+
+/* 决定敌人下一步：能走就走向 dist 更小的格，被堵就啃。 */
+function decideEnemy(e) {
+  const cur = dist[e.y][e.x];
+
+  /* 1) 贴到核心 → 直接啃核心（核心是终点，不给"走进去"的机会） */
+  for (let i = 0; i < 4; i++) {
+    const ax = e.x + NEI[i][0], ay = e.y + NEI[i][1];
+    if (inBounds(ax, ay) && grid[ay][ax] === CORE) {
+      e.mode = 'core'; e.tx = ax; e.ty = ay; return;
+    }
+  }
+
+  /* 2) 能走到核心就沿核心距离场下坡；核心被围死（Infinity）就改用 near 场去啃最近的墙。
+   * 这一条是"围死核心"这个漏洞的解药——围死只能拖延，不能免疫。 */
+  const field = cur === Infinity ? near : dist;
+  const curD = field[e.y][e.x];
+  let bestD = curD, bx = -1, by = -1, dx = -1, dy = -1;
+  for (let i = 0; i < 4; i++) {
+    const ax = e.x + NEI[i][0], ay = e.y + NEI[i][1];
+    if (!inBounds(ax, ay)) continue;
+    const g = grid[ay][ax];
+    if (g === EMPTY) {
+      const d = field[ay][ax];
+      if (d < bestD) { bestD = d; bx = ax; by = ay; }
+    } else if ((g === WALL || g === TOWER) && dx < 0) { dx = ax; dy = ay; }
+  }
+  if (bx >= 0) { e.mode = 'move'; e.nx = bx; e.ny = by; return; }
+
+  /* 3) 站在能啃的位上（field 已是 0）→ 直接开啃 */
+  if (dx >= 0) { e.mode = 'block'; e.tx = dx; e.ty = dy; return; }
+  e.mode = 'idle';
+}
+
+function hurtCore(amount) {
+  if (phase === 'over') return;
+  coreHP -= amount;
+  pushFx('coreHit', CX, CY);
+  if (coreHP <= 0) { coreHP = 0; phase = 'over'; pushFx('over'); }
+}
+
+function damageBlock(x, y, amount) {
+  if (!inBounds(x, y)) return;
+  const g = grid[y][x];
+  if (g !== WALL && g !== TOWER) return;
+  hp[y][x] -= amount;
+  pushFx('blockHit', x, y, g);
+  if (hp[y][x] <= 0) {
+    grid[y][x] = EMPTY; hp[y][x] = 0;
+    pushFx('blockBreak', x, y, g);
+    computeDist();                       /* 墙一破，全场重新找路 */
+  }
+}
+
+function damageEnemy(e, amount) {
+  if (e.dead) return;
+  e.chp -= amount;
+  e.flash = 1;
+  pushFx('enemyHit', e.x, e.y);
+  if (e.chp <= 0) {
+    e.dead = true;
+    gold += CFG.killGold;
+    killed++;
+    pushFx('enemyDie', e.x, e.y);
+  }
+}
+
+function updateEnemy(e, dt) {
+  e.born = Math.min(1, e.born + dt * 3.2);
+  e.flash = Math.max(0, e.flash - dt * 5);
+
+  if (e.mode === 'core') {
+    e.cd -= dt;
+    if (e.cd <= 0) { e.cd = CFG.coreDmgCD; hurtCore(CFG.coreDmg); }
+    approach(e, e.tx, e.ty, 0.55, dt);
+    return;
+  }
+  if (e.mode === 'block') {
+    e.cd -= dt;
+    if (e.cd <= 0) { e.cd = CFG.enemyAtkCD; damageBlock(e.tx, e.ty, CFG.enemyDmgBlock); }
+    approach(e, e.tx, e.ty, 0.5, dt);
+    return;
+  }
+  if (e.mode === 'idle') { e.vx = e.x; e.vy = e.y; return; }
+
+  /* 沿 (x,y) → (nx,ny) 推进 */
+  e.t += dt * e.spd;
+  if (e.t >= 1) {
+    e.x = e.nx; e.y = e.ny; e.t = 0;
+    e.vx = e.x; e.vy = e.y;
+    decideEnemy(e);                      /* 每到一格重新读一次距离场 */
+  } else {
+    e.vx = e.x + (e.nx - e.x) * e.t;
+    e.vy = e.y + (e.ny - e.y) * e.t;
+  }
+}
+
+/* 攻击姿态时把身体挪向目标的一部分（纯观感） */
+function approach(e, tx, ty, k, dt) {
+  const gx = e.x + (tx - e.x) * k, gy = e.y + (ty - e.y) * k;
+  const s = Math.min(1, dt * 8);
+  e.vx += (gx - e.vx) * s;
+  e.vy += (gy - e.vy) * s;
+}
+
+/* 敌人中心的浮点格坐标 */
+function enemyCX(e) { return e.vx + 0.5 + e.off; }
+function enemyCY(e) { return e.vy + 0.5; }
+
+/* ---- 炮塔开火 ---- */
+function updateTowers(dt) {
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      if (grid[y][x] !== TOWER) continue;
+      if (cds[y][x] > 0) cds[y][x] -= dt;
+      const cx = x + 0.5, cy = y + 0.5;
+      let best = null, bd = CFG.towerRange;
+      for (const e of enemies) {
+        if (e.dead) continue;
+        const d = Math.hypot(enemyCX(e) - cx, enemyCY(e) - cy);
+        if (d <= bd) { bd = d; best = e; }
+      }
+      if (!best) continue;
+      if (cds[y][x] <= 0) {
+        cds[y][x] = CFG.towerCD;
+        damageEnemy(best, CFG.towerDmg);
+        pushFx('shoot', x, y);
+      }
+    }
+  }
+}
+
+/* ---- 世界推进（纯逻辑，dt 秒） ---- */
+function updateWorld(dt) {
+  if (phase === 'over') return;          /* 失守后冻结战场，避免"死后还在动"的诡异感 */
+
+  if (phase !== 'wave' && phase !== 'rest') {
+    for (const e of enemies) updateEnemy(e, dt);   /* 只为了让出生动画播完 */
+    enemies = enemies.filter((e) => !e.dead);
+    return;
+  }
+  runTime += dt;
+
+  if (phase === 'wave') {
+    if (spawnLeft > 0) {
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) { spawnEnemy(); spawnLeft--; spawnTimer = spawnGap; }
+    } else if (!enemies.length) {
+      const bonus = waveBonus(wave);
+      gold += bonus;
+      pushFx('waveClear', wave, bonus);
+      phase = 'rest';
+      restTimer = CFG.restTime;
+    }
+  } else {
+    restTimer -= dt;
+    if (restTimer <= 0) { startWave(); return; }
+  }
+
+  for (const e of enemies) if (!e.dead) updateEnemy(e, dt);
+  enemies = enemies.filter((e) => !e.dead);
+  updateTowers(dt);
+}
+
+function startWave() {
+  if (phase === 'over' || phase === 'menu') return false;
+  wave++;
+  spawnLeft = waveEnemyCount(wave);
+  spawnGap = waveSpawnGap(wave);
+  spawnTimer = 0;
+  resetCooldowns();
+  phase = 'wave';
+  pushFx('waveStart', wave);
+  return true;
+}
+
+/* ---- 统计 ---- */
+function totalWalls() {
+  let n = 0;
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (grid[y][x] === WALL) n++;
+  return n;
+}
+function totalTowers() {
+  let n = 0;
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if (grid[y][x] === TOWER) n++;
+  return n;
+}
+
+/* ---- 等距投影与拾取 ----
+ * 这一段归在 LOGIC 段里是有意的：全是纯函数（只读 grid，不碰 canvas / DOM），
+ * 而「屏幕上的像素 → 算哪一格」恰恰是最容易错、又最不容易被浏览器断言抓住的一环。
+ * 切进 LOGIC 后 _block_defense_test.js 能在 vm 沙箱里直接对它下断言（见第 14 节）。
+ * 历史代价：核心正后方与斜后方那几格一度整格点不到，只能靠人眼看截图才发现。 */
+const VW = 960, VH = 700;               /* canvas 逻辑分辨率，CSS 负责缩放 */
+const TW = 72, TH = 36;                 /* 等距格宽 / 格高（2:1 经典比例） */
+const ZH = 28;                          /* 一个"标准高度单位"的像素值 */
+/* 立体物的高度表（像素）。渲染与拾取必须共用这一份数字 ——
+ * 拾取是按「抬高后的轮廓」判命的，两边一旦不同步，点击区就和画面错位，
+ * 而这种错位在任何逻辑断言里都看不出来（和 voxel-craft「禁止裸格子边长」同一个道理）。 */
+const HH = { core: ZH * 1.05, wall: ZH * 0.72, tower: ZH * 0.62, enemy: ZH * 0.5 };
+const ORIGIN_X = VW / 2, ORIGIN_Y = 150;
+
+function sxOf(x, y) { return ORIGIN_X + (x - y) * TW / 2; }
+function syOf(x, y) { return ORIGIN_Y + (x + y) * TH / 2; }
+
+/* ---- 屏幕坐标 → 格子 ----
+ * 逐格做轮廓命中测试，从屏幕近处往远处扫，第一个命中的就是玩家看到的那一格。
+ * 用多边形而不是简单的菱形，是因为立方体在屏幕上是个六边形轮廓：
+ * 只测顶面菱形的话，方块下半截（视觉上是侧面）会整片点不到 ——
+ * 实测点 (3,5) 那块墙的地面投影位置会完全落空（顶面已经向上抬了 20px，差值超出菱形范围）。 */
+const PICK_ORDER = (() => {
+  const o = [];
+  for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) o.push([x, y]);
+  o.sort((a, b) => (b[0] + b[1]) - (a[0] + a[1]) || b[0] - a[0]);
+  return o;
+})();
+
+/* 射线法判点在多边形内 */
+function pointInPoly(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function cubeHeight(x, y) {
+  const g = grid[y][x];
+  if (g === EMPTY) return 0;
+  if (g === CORE) return HH.core;
+  if (g === TOWER) return HH.tower;
+  return HH.wall;
+}
+
+function pickCell(mx, my) {
+  for (const [x, y] of PICK_ORDER) {
+    /* 核心不参与「抬高轮廓」的命中。
+     * 它是全场最高的方块，在屏幕上会向上吃掉正后方一整个格子 —— 而核心斜对角那 4 格
+     * 在空格状态下，菱形只剩北角一段约 6.6px 高的窄尖没被吃掉，鼠标实际上点不中；
+     * 偏偏那 4 格是最关键的防守位。核心本来也不接受任何点击操作，所以只用它的地面菱形
+     * 参与命中，把上方区域让给背后的格子。实测：不这么改，(4,4)/(6,4)/(4,6) 三格全废。
+     * 代价（有意接受）：点核心的上表面会命中它背后那一格。核心本来就不可交互，
+     * 玩家没有理由去点它；反过来「那 4 格点不到」是每一局都会踩到的硬伤，两害相权。 */
+    const isCore = grid[y][x] === CORE;
+    const h = isCore ? 0 : cubeHeight(x, y);
+    const ax = sxOf(x, y), ay = syOf(x, y);
+    const bx = sxOf(x + 1, y), by = syOf(x + 1, y);
+    const cx = sxOf(x + 1, y + 1), cy = syOf(x + 1, y + 1);
+    const dx = sxOf(x, y + 1), dy = syOf(x, y + 1);
+    /* 包围盒粗筛，省掉绝大多数格子的多边形运算 */
+    if (mx < dx || mx > bx || my < ay - h || my > cy) continue;
+    const hit = h === 0
+      ? pointInPoly(mx, my, [[ax, ay], [bx, by], [cx, cy], [dx, dy]])
+      /* 六边形轮廓：顶面四点抬高 h，再接回地面的东角与南角 */
+      : pointInPoly(mx, my, [[ax, ay - h], [bx, by - h], [bx, by], [cx, cy], [dx, dy], [dx, dy - h]]);
+    if (hit) return { x, y };
+  }
+  return null;
+}
+
+/* ===== RENDER 渲染（canvas 绘制 / 粒子 / 音效） ===== */
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+
+/* ---- 配色：光源假设在左上方（左面比右面亮） ---- */
+const PAL = {
+  floorA: '#111a2b', floorB: '#0e1626', floorLine: 'rgba(120,160,220,.13)',
+  wall:  { top: '#7d8ea8', l: '#5b6a80', r: '#47566b' },
+  tower: { top: '#3fb9d8', l: '#2a7f97', r: '#1d6076' },
+  core:  { top: '#c9a4ff', l: '#8b5cf6', r: '#6d3fd6' },
+  enemy: { top: '#ff7a8a', l: '#d2404f', r: '#a92a38' },
+  enemyHit: { top: '#ffffff', l: '#ffd0d6', r: '#e8a8b0' },
+  ghostOk: 'rgba(94,224,138,.34)', ghostNo: 'rgba(255,92,114,.30)',
+};
+
+/* 画一个等高立方体：先两个可见侧面，再顶面 */
+function cube(x, y, hpx, col) {
+  const ax = sxOf(x, y), ay = syOf(x, y);
+  const bx = sxOf(x + 1, y), by = syOf(x + 1, y);
+  const cx = sxOf(x + 1, y + 1), cy = syOf(x + 1, y + 1);
+  const dx = sxOf(x, y + 1), dy = syOf(x, y + 1);
+  ctx.fillStyle = col.l;
+  ctx.beginPath();
+  ctx.moveTo(dx, dy); ctx.lineTo(cx, cy); ctx.lineTo(cx, cy - hpx); ctx.lineTo(dx, dy - hpx);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = col.r;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy); ctx.lineTo(bx, by); ctx.lineTo(bx, by - hpx); ctx.lineTo(cx, cy - hpx);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = col.top;
+  ctx.beginPath();
+  ctx.moveTo(ax, ay - hpx); ctx.lineTo(bx, by - hpx);
+  ctx.lineTo(cx, cy - hpx); ctx.lineTo(dx, dy - hpx);
+  ctx.closePath(); ctx.fill();
+}
+
+/* ---- 粒子 ---- */
+let parts = [];
+function burst(px, py, color, n, speed, life) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = speed * (0.4 + Math.random() * 0.7);
+    parts.push({ x: px, y: py, vx: Math.cos(a) * v, vy: Math.sin(a) * v - speed * 0.5,
+      life: life * (0.6 + Math.random() * 0.6), max: life, c: color, s: 1.5 + Math.random() * 2.5 });
+  }
+  if (parts.length > 500) parts.splice(0, parts.length - 500);
+}
+function updateParts(dt) {
+  for (const p of parts) { p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.vy += 0.22 * dt * 60; p.life -= dt; }
+  parts = parts.filter((p) => p.life > 0);
+}
+
+/* ---- 音效（WebAudio 合成，零外部资源） ---- */
+let AC = null;
+let shake = 0;
+let sfxBudget = 0;
+
+function audio() {
+  if (AC === null) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = false; } }
+  return AC || null;
+}
+function tone(freq, dur, type, vol, slideTo) {
+  if (sfxBudget <= 0) return;
+  const ac = audio(); if (!ac) return;
+  sfxBudget--;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(freq, ac.currentTime);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), ac.currentTime + dur);
+  g.gain.setValueAtTime(vol || 0.05, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(); o.stop(ac.currentTime + dur + 0.02);
+}
+function noise(dur, vol) {
+  if (sfxBudget <= 0) return;
+  const ac = audio(); if (!ac) return;
+  sfxBudget--;
+  const n = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(1, n, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = ac.createBufferSource(), g = ac.createGain();
+  s.buffer = buf; g.gain.value = vol || 0.06;
+  s.connect(g); g.connect(ac.destination); s.start();
+}
+
+/* 把逻辑层投递的事件翻译成声音 + 粒子。这样 LOGIC 段可以完全不认识 canvas。 */
+function consumeFx() {
+  sfxBudget = 10;                        /* 每帧音效上限：避免敌人一多就爆音 */
+  for (const f of fxQueue) {
+    const px = sxOf(f.a + 0.5, f.b + 0.5), py = syOf(f.a + 0.5, f.b + 0.5);
+    if (f.kind === 'place') tone(300, 0.07, 'square', 0.035, 460);
+    else if (f.kind === 'dig') tone(220, 0.08, 'triangle', 0.04, 130);
+    else if (f.kind === 'deny') tone(130, 0.10, 'sawtooth', 0.035, 95);
+    else if (f.kind === 'shoot') tone(760, 0.045, 'square', 0.02, 1250);
+    else if (f.kind === 'spawn') burst(px, py, '#ff7a8a', 6, 1.8, 0.3);
+    else if (f.kind === 'enemyHit') noise(0.05, 0.02);
+    else if (f.kind === 'enemyDie') { tone(420, 0.14, 'square', 0.04, 140); burst(px, py - ZH * 0.3, '#ff7a8a', 14, 2.6, 0.5); }
+    else if (f.kind === 'blockHit') burst(px, py - ZH * 0.4, '#c8d4e6', 4, 1.6, 0.28);
+    else if (f.kind === 'blockBreak') { noise(0.16, 0.05); burst(px, py - ZH * 0.4, f.c === TOWER ? '#3fb9d8' : '#8b9bb4', 16, 2.4, 0.55); }
+    else if (f.kind === 'coreHit') { tone(90, 0.28, 'sawtooth', 0.07, 55); shake = Math.max(shake, 9); }
+    else if (f.kind === 'waveStart') tone(330, 0.16, 'triangle', 0.05, 620);
+    else if (f.kind === 'waveClear') tone(520, 0.1, 'triangle', 0.05, 780);
+    else if (f.kind === 'over') { tone(300, 0.7, 'sawtooth', 0.08, 60); shake = 16; }
+  }
+  fxQueue.length = 0;
+}
+
+/* ---- 场景绘制 ---- */
+let hover = null;
+let now = 0;
+
+function drawCoreGlow() {
+  const gx = sxOf(CX + 0.5, CY + 0.5), gy = syOf(CX + 0.5, CY + 0.5);
+  const g = ctx.createRadialGradient(gx, gy, 4, gx, gy, TW * 1.5);
+  g.addColorStop(0, 'rgba(150,110,255,.30)');
+  g.addColorStop(1, 'rgba(150,110,255,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(gx, gy, TW * 1.5, TH * 1.5, 0, 0, Math.PI * 2); ctx.fill();
+}
+
+function drawFloor() {
+  for (let sum = 0; sum <= GW + GH - 2; sum++) {
+    for (let x = 0; x < GW; x++) {
+      const y = sum - x;
+      if (y < 0 || y >= GH) continue;
+      const ax = sxOf(x, y), ay = syOf(x, y);
+      const bx = sxOf(x + 1, y), by = syOf(x + 1, y);
+      const cx = sxOf(x + 1, y + 1), cy = syOf(x + 1, y + 1);
+      const dx = sxOf(x, y + 1), dy = syOf(x, y + 1);
+      ctx.fillStyle = ((x + y) & 1) ? PAL.floorA : PAL.floorB;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.lineTo(dx, dy);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = PAL.floorLine; ctx.lineWidth = 1; ctx.stroke();
+    }
+  }
+  /* 箭头层单独画一遍，避免被后面格子的填充盖掉。
+   * 有路时指向核心（近处偏红＝危险）；核心被围死时改画 near 场，用橙色提示"敌人会来啃这里的墙"。 */
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      if (grid[y][x] !== EMPTY) continue;
+      const toCore = dist[y][x] !== Infinity;
+      const field = toCore ? dist : near;
+      const dirs = toCore ? direct : nearDir;
+      const v = field[y][x];
+      if (v === Infinity || v === 0) continue;
+      const i = dirs[y][x];
+      if (i < 0) continue;
+      const px = sxOf(x + 0.5, y + 0.5), py = syOf(x + 0.5, y + 0.5);
+      const ddx = (NEI[i][0] - NEI[i][1]) * TW * 0.16;
+      const ddy = (NEI[i][0] + NEI[i][1]) * TH * 0.16;
+      ctx.save();
+      if (toCore) {
+        const heat = Math.max(0, Math.min(1, 1 - v / 14));
+        ctx.globalAlpha = 0.12 + heat * 0.20;
+        ctx.fillStyle = heat > 0.6 ? '#ff8fa0' : '#7fb0e0';
+      } else {
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = '#ffb066';
+      }
+      ctx.beginPath();
+      ctx.moveTo(px + ddx * 1.5, py + ddy * 1.5);
+      ctx.lineTo(px - ddy * 0.62 - ddx * 0.3, py + ddx * 0.62 - ddy * 0.3);
+      ctx.lineTo(px + ddy * 0.62 - ddx * 0.3, py - ddx * 0.62 - ddy * 0.3);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+function drawHover() {
+  if (!hover) return;
+  const { x, y } = hover;
+  const ok = buildMode === 'dig' ? canDig(x, y) : (canBuild(x, y) && gold >= costOf(buildMode));
+  const h = cubeHeight(x, y);
+  const ax = sxOf(x, y), ay = syOf(x, y);
+  const bx = sxOf(x + 1, y), by = syOf(x + 1, y);
+  const cx = sxOf(x + 1, y + 1), cy = syOf(x + 1, y + 1);
+  const dx = sxOf(x, y + 1), dy = syOf(x, y + 1);
+  ctx.save();
+  ctx.fillStyle = ok ? PAL.ghostOk : PAL.ghostNo;
+  ctx.beginPath();
+  ctx.moveTo(ax, ay - h); ctx.lineTo(bx, by - h); ctx.lineTo(cx, cy - h); ctx.lineTo(dx, dy - h);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = ok ? 'rgba(94,224,138,.85)' : 'rgba(255,92,114,.8)';
+  ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+
+  /* 炮塔射程预览：这是"引导"玩法的核心信息，必须给 */
+  if (buildMode === 'tower' && ok) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(67,224,255,.55)'; ctx.lineWidth = 1.6;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.ellipse(sxOf(x + 0.5, y + 0.5), syOf(x + 0.5, y + 0.5),
+      CFG.towerRange * TW / 2, CFG.towerRange * TH / 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawTowerGuns(x, y) {
+  const px = sxOf(x + 0.5, y + 0.5), py = syOf(x + 0.5, y + 0.5) - HH.tower;
+  const since = CFG.towerCD - cds[y][x];
+  const pulse = (since >= 0 && since < 0.13) ? 1 - since / 0.13 : 0;
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.fillStyle = '#0b1420';
+  ctx.beginPath(); ctx.ellipse(0, 0, TW * 0.20, TH * 0.20, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#7ef0ff';
+  ctx.beginPath(); ctx.ellipse(0, -2, TW * 0.085, TH * 0.085, 0, 0, Math.PI * 2); ctx.fill();
+  if (pulse > 0) {
+    ctx.globalAlpha = pulse * 0.55;
+    ctx.strokeStyle = '#9ff4ff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, 0, TW * 0.26 + pulse * 9, TH * 0.26 + pulse * 4.5, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEnemy(e) {
+  const px = enemyCX(e), py = enemyCY(e);
+  const bob = Math.sin(now * 6 + e.off * 30) * 1.6;
+  const sc = 0.55 + 0.45 * e.born;
+  const lift = (1 - sc) * HH.enemy;
+  const col = e.flash > 0 ? PAL.enemyHit : PAL.enemy;
+  const hpx = HH.enemy * sc;
+  const w = TW * 0.30 * sc, h = TH * 0.30 * sc;
+  const X = sxOf(px, py), Y = syOf(px, py) + bob;
+
+  ctx.save();
+  ctx.translate(X, Y);
+  /* 侧面先画、顶面后画，接缝不会露 */
+  ctx.fillStyle = col.l;
+  ctx.beginPath();
+  ctx.moveTo(-w, lift - hpx); ctx.lineTo(0, lift - hpx + h); ctx.lineTo(0, lift + h); ctx.lineTo(-w, lift);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = col.r;
+  ctx.beginPath();
+  ctx.moveTo(w, lift - hpx); ctx.lineTo(0, lift - hpx + h); ctx.lineTo(0, lift + h); ctx.lineTo(w, lift);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = col.top;
+  ctx.beginPath();
+  ctx.moveTo(-w, lift - hpx); ctx.lineTo(0, lift - hpx + h); ctx.lineTo(w, lift - hpx); ctx.lineTo(0, lift - hpx - h);
+  ctx.closePath(); ctx.fill();
+
+  /* 眼睛：让"这是活物"一眼可辨 */
+  if (sc > 0.8) {
+    ctx.fillStyle = 'rgba(20,10,14,.85)';
+    ctx.beginPath(); ctx.ellipse(-w * 0.34, lift - hpx + h * 0.05, w * 0.13, h * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(w * 0.06, lift - hpx + h * 0.60, w * 0.13, h * 0.13, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  /* 血条 */
+  if (sc > 0.9 && e.chp < e.mhp) {
+    const bw = TW * 0.42, bh = 4, bx = -bw / 2, by = lift - hpx - 13;
+    const r = Math.max(0, e.chp / e.mhp);
+    ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = r > 0.5 ? '#5ee08a' : r > 0.25 ? '#ffd166' : '#ff5c72';
+    ctx.fillRect(bx, by, bw * r, bh);
+  }
+  ctx.restore();
+}
+
+function drawCore() {
+  const pulse = 0.5 + 0.5 * Math.sin(now * 2.4);
+  cube(CX, CY, HH.core, PAL.core);
+  ctx.save();
+  ctx.translate(sxOf(CX + 0.5, CY + 0.5), syOf(CX + 0.5, CY + 0.5) - HH.core);
+  ctx.rotate(now * 0.9);
+  ctx.fillStyle = 'rgba(255,255,255,' + (0.55 + pulse * 0.35) + ')';
+  const s = TW * 0.10 * (0.85 + pulse * 0.2);
+  ctx.beginPath();
+  ctx.moveTo(0, -s); ctx.lineTo(s, 0); ctx.lineTo(0, s); ctx.lineTo(-s, 0);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawBarOn(x, y, ratio, top) {
+  const px = sxOf(x + 0.5, y + 0.5), py = syOf(x + 0.5, y + 0.5) - top - 9;
+  ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(px - 14, py, 28, 3.5);
+  ctx.fillStyle = ratio > 0.5 ? '#5ee08a' : '#ffd166';
+  ctx.fillRect(px - 14, py, 28 * Math.max(0, ratio), 3.5);
+}
+
+function drawScene() {
+  ctx.setTransform(canvas.width / VW, 0, 0, canvas.height / VH, 0, 0);
+  ctx.clearRect(0, 0, VW, VH);
+
+  ctx.save();
+  if (shake > 0.1) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+
+  drawCoreGlow();
+  drawFloor();
+
+  /* 所有立体物按 (x+y) 排序后统一绘制，保证前后遮挡正确；核心也进队列 */
+  const list = [{ key: CX + CY, kind: 'C', x: CX, y: CY, px: CX, py: CY }];
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      const g = grid[y][x];
+      if (g === WALL || g === TOWER) list.push({ key: x + y, kind: g, x, y, px: x, py: y });
+    }
+  }
+  for (const e of enemies) {
+    const ex = enemyCX(e), ey = enemyCY(e);
+    list.push({ key: ex + ey, kind: 'E', e, px: ex, py: ey });
+  }
+  list.sort((a, b) => a.key - b.key || a.px - b.px);
+
+  for (const it of list) {
+    if (it.kind === 'C') { drawCore(); continue; }
+    if (it.kind === 'E') { drawEnemy(it.e); continue; }
+    if (it.kind === WALL) {
+      cube(it.x, it.y, HH.wall, PAL.wall);
+      /* 顶面砖缝 */
+      ctx.save();
+      ctx.globalAlpha = 0.16;
+      ctx.strokeStyle = '#0a0f18'; ctx.lineWidth = 1;
+      const hh = HH.wall;
+      ctx.beginPath();
+      ctx.moveTo((sxOf(it.x, it.y) + sxOf(it.x + 1, it.y + 1)) / 2, (syOf(it.x, it.y) + syOf(it.x + 1, it.y + 1)) / 2 - hh);
+      ctx.lineTo((sxOf(it.x + 1, it.y) + sxOf(it.x, it.y + 1)) / 2, (syOf(it.x + 1, it.y) + syOf(it.x, it.y + 1)) / 2 - hh);
+      ctx.stroke();
+      ctx.restore();
+      drawBarOn(it.x, it.y, hp[it.y][it.x] / CFG.wallHP, HH.wall);
+    } else {
+      cube(it.x, it.y, HH.tower, PAL.tower);
+      drawTowerGuns(it.x, it.y);
+      drawBarOn(it.x, it.y, hp[it.y][it.x] / CFG.towerHP, HH.tower);
+    }
+  }
+
+  /* 敌人贴脸核心时，核心叠一层受击红 */
+  if (enemies.some((e) => e.mode === 'core')) {
+    const gx = sxOf(CX + 0.5, CY + 0.5), gy = syOf(CX + 0.5, CY + 0.5);
+    ctx.save();
+    ctx.globalAlpha = 0.18 + 0.14 * Math.abs(Math.sin(now * 7));
+    const g = ctx.createRadialGradient(gx, gy, 4, gx, gy, TW * 1.3);
+    g.addColorStop(0, 'rgba(255,60,80,.9)');
+    g.addColorStop(1, 'rgba(255,60,80,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(gx, gy, TW * 1.3, TH * 1.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  /* 悬停高亮画在最上层：它是 UI 反馈，不属于场景。
+   * 画在 3D 物之前的话，「被前方方块挡住的那一格」的高亮会被盖掉，
+   * 玩家在点下去之前得不到任何提示 —— 而当前拾取规则正是按可见轮廓算的，
+   * 高亮反而看不见，就等于没提示。 */
+  drawHover();
+
+  for (const p of parts) {
+    ctx.globalAlpha = Math.max(0, p.life / p.max);
+    ctx.fillStyle = p.c;
+    ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  if (shake > 0) shake = Math.max(0, shake - 0.6);
+}
+
+/* ---- HUD（DOM 层） ---- */
+const $ = (id) => document.getElementById(id);
+const BBTNS = [];
+const VEIL = {
+  root: null, title: null, sub: null, list: null, go: null, best: null,
+};
+
+function initDom() {
+  VEIL.root = $('veil');
+  VEIL.title = $('veilTitle');
+  VEIL.sub = $('veilSub');
+  VEIL.list = $('veilList');
+  VEIL.go = $('btnStart');
+  VEIL.best = $('veilBest');
+  for (const b of document.querySelectorAll('.bbtn')) BBTNS.push(b);
+  $('costWall').textContent = CFG.wallCost + ' 金';
+  $('costTower').textContent = CFG.towerCost + ' 金';
+}
+
+function renderHUD() {
+  const ratio = Math.max(0, coreHP / CFG.coreHP);
+  $('hpV').textContent = Math.ceil(Math.max(0, coreHP));
+  const bar = $('hpBar');
+  bar.style.width = (ratio * 100).toFixed(1) + '%';
+  bar.style.background = ratio > 0.5 ? 'linear-gradient(90deg,#5ee08a,#43e0ff)'
+    : ratio > 0.25 ? 'linear-gradient(90deg,#ffd166,#ffa94d)'
+    : 'linear-gradient(90deg,#ff5c72,#ff8fa0)';
+  $('goldV').textContent = Math.floor(gold);
+  $('waveV').textContent = wave;
+
+  for (const b of BBTNS) {
+    const m = b.getAttribute('data-mode');
+    b.classList.toggle('on', m === buildMode);
+    b.classList.toggle('no', m !== 'dig' && gold < costOf(m));
+  }
+
+  const btn = $('btnWave');
+  if (phase === 'ready') { btn.textContent = '开始第 ' + (wave + 1) + ' 波'; btn.disabled = false; }
+  else if (phase === 'rest') { btn.textContent = '第 ' + (wave + 1) + ' 波 · ' + Math.ceil(Math.max(0, restTimer)) + 's'; btn.disabled = false; }
+  else if (phase === 'wave') { btn.textContent = '第 ' + wave + ' 波 · 剩 ' + (spawnLeft + enemies.length); btn.disabled = true; }
+  else if (phase === 'over') { btn.textContent = '已失守'; btn.disabled = true; }
+  else { btn.textContent = '开始'; btn.disabled = true; }
+
+  /* 只在变化时读一次 localStorage（每帧读会拖慢主循环） */
+  const b = Math.max(loadBest(), wave);
+  if (b !== bestShown) { bestShown = b; $('bestV').textContent = b; }
+}
+let bestShown = -1;
+
+/* ---- 遮罩 / 提示 ---- */
+let toastTimer = 0;
+const VEIL_LIST_HTML =
+  '<li><em>🧱</em><span>石墙便宜、耐揍，只负责挡路和拖时间。</span></li>' +
+  '<li><em>🏹</em><span>炮塔昂贵、脆，但它才是唯一的输出。</span></li>' +
+  '<li><em>🎯</em><span>把墙修成漏斗，逼敌人绕进炮塔的射程里——这才是这游戏真正在玩的东西。</span></li>';
+
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  toastTimer = 1.6;
+}
+
+function showVeil(over) {
+  VEIL.title.innerHTML = over ? '防线<em>失守</em>' : '方块<em>防线</em>';
+  VEIL.sub.innerHTML = over
+    ? '核心被啃穿了。这一局你守到第 <b style="color:var(--gold)">' + wave + '</b> 波，一共点掉 <b style="color:var(--gold)">' + killed + '</b> 个敌人。'
+    : '敌人从四周爬向中央的核心。你只有两种方块，但每一块都会<b style="color:var(--accent)">改变它们走的路</b>。';
+  VEIL.list.innerHTML = VEIL_LIST_HTML;
+  VEIL.go.textContent = over ? '再来一局' : '开始防守';
+  VEIL.best.textContent = loadBest();
+  VEIL.root.classList.remove('hide');
+}
+function hideVeil() { VEIL.root.classList.add('hide'); }
+
+/* ---- 最高波数存档 ---- */
+const BEST_KEY = 'blockdefense.best.v1';
+function loadBest() {
+  try { return Math.max(0, parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0); } catch (e) { return 0; }
+}
+function saveBest(n) {
+  try { if (n > loadBest()) localStorage.setItem(BEST_KEY, String(n)); } catch (e) { /* 隐私模式忽略 */ }
+}
+
+/* ===== INPUT 输入（鼠标 / 触屏 / 键盘） ===== */
+
+function toLocal(ev) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (ev.clientX - r.left) / Math.max(1, r.width) * VW,
+    y: (ev.clientY - r.top) / Math.max(1, r.height) * VH,
+  };
+}
+
+function selectMode(m) {
+  buildMode = m;
+  const names = { wall: '石墙', tower: '炮塔', dig: '拆除' };
+  toast('建造：' + names[m]);
+}
+
+function actAt(ev) {
+  if (phase === 'menu' || phase === 'over') return;
+  const p = toLocal(ev);
+  const c = pickCell(p.x, p.y);
+  if (!c) return;
+  const r = useCell(c.x, c.y);
+  if (r === 'poor') toast('金币不够（' + costOf(buildMode) + ' 金）');
+  else if (r === 'blocked') toast('这格已经被占了');
+  else if (r === 'none' && buildMode === 'dig') toast('这里没东西可拆');
+}
+
+function onMove(ev) {
+  const p = toLocal(ev);
+  hover = pickCell(p.x, p.y);
+}
+
+canvas.addEventListener('mousemove', onMove);
+canvas.addEventListener('mouseleave', () => { hover = null; });
+canvas.addEventListener('mousedown', (ev) => {
+  if (ev.button === 0) { actAt(ev); return; }
+  if (ev.button !== 2) return;
+  if (phase === 'menu' || phase === 'over') return;
+  const p = toLocal(ev);
+  const c = pickCell(p.x, p.y);
+  if (c && canDig(c.x, c.y)) {
+    const t = grid[c.y][c.x];
+    const back = Math.floor((t === TOWER ? CFG.towerCost : CFG.wallCost) * CFG.refund);
+    dig(c.x, c.y);
+    toast('拆除 +' + back + ' 金');
+  }
+});
+canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+
+canvas.addEventListener('touchstart', (ev) => {
+  ev.preventDefault();
+  onMove(ev.changedTouches[0]);
+  actAt(ev.changedTouches[0]);
+}, { passive: false });
+canvas.addEventListener('touchmove', (ev) => { ev.preventDefault(); onMove(ev.changedTouches[0]); }, { passive: false });
+canvas.addEventListener('touchend', (ev) => { ev.preventDefault(); hover = null; }, { passive: false });
+
+window.addEventListener('keydown', (ev) => {
+  if (ev.code === 'Digit1') selectMode('wall');
+  else if (ev.code === 'Digit2') selectMode('tower');
+  else if (ev.code === 'Digit3') selectMode('dig');
+  else if (ev.code === 'Space') { ev.preventDefault(); if (phase === 'ready' || phase === 'rest') startWave(); }
+});
+
+document.getElementById('buildbar').addEventListener('click', (ev) => {
+  const b = ev.target && ev.target.closest ? ev.target.closest('.bbtn') : null;
+  if (b) selectMode(b.getAttribute('data-mode'));
+});
+
+$('btnWave').addEventListener('click', () => {
+  if (phase === 'ready' || phase === 'rest') startWave();
+});
+
+const SPEEDS = [1, 2, 3];
+let speedIdx = 0;
+$('btnSpeed').addEventListener('click', () => {
+  speedIdx = (speedIdx + 1) % SPEEDS.length;
+  $('btnSpeed').textContent = '速度 ×' + SPEEDS[speedIdx];
+});
+
+$('btnStart').addEventListener('click', () => {
+  audio();                                  /* 必须在用户手势里初始化音频上下文 */
+  if (phase === 'over') saveBest(wave);
+  resetGame();
+  hideVeil();
+  toast('先布两座炮塔，再点右上角开波');
+});
+
+/* ===== LOOP 主循环 ===== */
+
+function syncCanvasSize() {
+  const wrap = document.getElementById('wrap');
+  const aw = Math.max(1, wrap.clientWidth), ah = Math.max(1, wrap.clientHeight);
+  const scale = Math.min(aw / VW, ah / VH);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.style.width = Math.floor(VW * scale) + 'px';
+  canvas.style.height = Math.floor(VH * scale) + 'px';
+  canvas.width = Math.max(1, Math.round(VW * scale * dpr));
+  canvas.height = Math.max(1, Math.round(VH * scale * dpr));
+}
+
+let prev = performance.now();
+let acc = 0;
+let failHandled = false;
+const FIXED = 1 / 60;
+
+function frame(ts) {
+  requestAnimationFrame(frame);
+  const dtRaw = (ts - prev) / 1000;
+  prev = ts;
+  const dt = Math.min(0.1, Math.max(0, dtRaw));   /* 上下界都要封：负 dt 会让计时器反向跑 */
+  now += dt;
+
+  const mul = SPEEDS[speedIdx];
+  acc = Math.min(acc + dt * mul, FIXED * 8);
+  let guard = 0;
+  while (acc >= FIXED && guard++ < 8) { updateWorld(FIXED); acc -= FIXED; }
+
+  updateParts(dt * mul);
+  consumeFx();
+
+  if (phase === 'over' && !failHandled) {
+    failHandled = true;
+    saveBest(wave);
+    showVeil(true);
+  } else if (phase !== 'over') {
+    failHandled = false;
+  }
+
+  drawScene();
+  renderHUD();
+
+  if (toastTimer > 0) {
+    toastTimer -= dt;
+    if (toastTimer <= 0) $('toast').classList.remove('show');
+  }
+}
+
+/* ---- 启动 ---- */
+initDom();
+resetGame();
+phase = 'menu';                 /* 开局先停在遮罩上，不进入 ready */
+showVeil(false);
+syncCanvasSize();
+window.addEventListener('resize', syncCanvasSize);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

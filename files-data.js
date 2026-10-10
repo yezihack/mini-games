@@ -1,14 +1,14 @@
 // ⚠ 本文件由 scan.js 自动生成，请勿手动编辑（改了也会被下次扫描覆盖）。
-// 生成时间：2026-09-20T11:29:22.360Z
+// 生成时间：2026-10-10T12:01:20.888Z
 // 想让某个人页面自定义分类/图标/简介，请改那个 html 的 <head> 里的 wb-* 标签。
 window.__GAMES_INDEX__ = {
-  "generatedAt": "2026-09-20T11:29:22.360Z",
+  "generatedAt": "2026-10-10T12:01:20.888Z",
   "rootName": "mini-games",
   "scanDirs": [
     ".",
     "games"
   ],
-  "count": 10,
+  "count": 12,
   "categories": [
     "游戏",
     "学习训练"
@@ -19,7 +19,7 @@ window.__GAMES_INDEX__ = {
       "rel": "games/voxel-craft.html",
       "url": "games/voxel-craft.html",
       "title": "方块世界 · Voxel Craft",
-      "desc": "纯手写 WebGL 的 3D 方块沙盒：无限程序化地形、挖掘与放置、飞行与重力、第一人称视角，无任何外部依赖离线可玩。",
+      "desc": "纯手写 WebGL 的 3D 方块沙盒：无限程序化地形、3×3 合成台、村庄与村民、挖掘放置、飞行重力，无外部依赖离线可玩。",
       "category": "游戏",
       "icon": "⛏️",
       "tags": [
@@ -27,12 +27,13 @@ window.__GAMES_INDEX__ = {
         "沙盒",
         "方块",
         "WebGL",
+        "合成",
         "第一人称",
         "建造"
       ],
       "group": "games",
-      "size": 100420,
-      "mtime": "2026-09-20T03:32:17.486Z",
+      "size": 255272,
+      "mtime": "2026-10-10T11:47:04.336Z",
       "order": 5
     },
     {
@@ -53,6 +54,27 @@ window.__GAMES_INDEX__ = {
       "size": 26073,
       "mtime": "2026-09-20T03:31:56.171Z",
       "order": 10
+    },
+    {
+      "file": "block-defense.html",
+      "rel": "games/block-defense.html",
+      "url": "games/block-defense.html",
+      "title": "方块防线 · 等距塔防 | Block Defense",
+      "desc": "等距视角的方块塔防：你放的每一块既挡路又改变敌人行军路线，把它们引导进炮塔火力网。无尽波次。",
+      "category": "游戏",
+      "icon": "🛡️",
+      "tags": [
+        "塔防",
+        "策略",
+        "等距",
+        "方块",
+        "无尽",
+        "迷宫"
+      ],
+      "group": "games",
+      "size": 51402,
+      "mtime": "2026-10-10T11:29:13.904Z",
+      "order": 15
     },
     {
       "file": "snake-game.html",
@@ -153,6 +175,27 @@ window.__GAMES_INDEX__ = {
       "size": 44906,
       "mtime": "2026-09-20T03:31:42.953Z",
       "order": 60
+    },
+    {
+      "file": "merge-2048.html",
+      "rel": "games/merge-2048.html",
+      "url": "games/merge-2048.html",
+      "title": "数字合并 · 极速 2048",
+      "desc": "滑动合并相同数字，限时内冲上 2048",
+      "category": "游戏",
+      "icon": "🔢",
+      "tags": [
+        "数字",
+        "合并",
+        "2048",
+        "益智",
+        "限时",
+        "休闲"
+      ],
+      "group": "games",
+      "size": 19784,
+      "mtime": "2026-09-21T02:39:42.264Z",
+      "order": 100
     },
     {
       "file": "tank-battle.html",
