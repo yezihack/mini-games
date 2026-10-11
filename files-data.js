@@ -1,8 +1,8 @@
 // ⚠ 本文件由 scan.js 自动生成，请勿手动编辑（改了也会被下次扫描覆盖）。
-// 生成时间：2026-10-10T12:01:20.888Z
+// 生成时间：2026-10-11T06:46:01.267Z
 // 想让某个人页面自定义分类/图标/简介，请改那个 html 的 <head> 里的 wb-* 标签。
 window.__GAMES_INDEX__ = {
-  "generatedAt": "2026-10-10T12:01:20.888Z",
+  "generatedAt": "2026-10-11T06:46:01.267Z",
   "rootName": "mini-games",
   "scanDirs": [
     ".",
@@ -33,7 +33,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 255272,
-      "mtime": "2026-10-10T11:47:04.336Z",
+      "mtime": "2026-10-11T06:45:56.113Z",
       "order": 5
     },
     {
@@ -52,7 +52,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 26073,
-      "mtime": "2026-09-20T03:31:56.171Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 10
     },
     {
@@ -73,7 +73,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 51402,
-      "mtime": "2026-10-10T11:29:13.904Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 15
     },
     {
@@ -93,7 +93,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 15640,
-      "mtime": "2026-09-20T03:32:05.076Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 20
     },
     {
@@ -112,8 +112,8 @@ window.__GAMES_INDEX__ = {
         "跑酷"
       ],
       "group": "games",
-      "size": 16420,
-      "mtime": "2026-09-20T03:31:21.850Z",
+      "size": 15925,
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 30
     },
     {
@@ -133,7 +133,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 18991,
-      "mtime": "2026-09-20T03:31:29.488Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 40
     },
     {
@@ -153,7 +153,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 22696,
-      "mtime": "2026-09-20T04:33:54.463Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 50
     },
     {
@@ -173,7 +173,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 44906,
-      "mtime": "2026-09-20T03:31:42.953Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 60
     },
     {
@@ -194,27 +194,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 19784,
-      "mtime": "2026-09-21T02:39:42.264Z",
-      "order": 100
-    },
-    {
-      "file": "tank-battle.html",
-      "rel": "games/tank-battle.html",
-      "url": "games/tank-battle.html",
-      "title": "坦克大战 · 十关战役 | Tank Battle",
-      "desc": "经典坦克大战：守老巢、歼敌军，十关战役任你打，砖墙炸开、道具吃满。",
-      "category": "游戏",
-      "icon": "🎖️",
-      "tags": [
-        "坦克",
-        "射击",
-        "关卡",
-        "经典",
-        "街机"
-      ],
-      "group": "games",
-      "size": 55046,
-      "mtime": "2026-09-20T08:24:01.446Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 100
     },
     {
@@ -234,7 +214,27 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 13340,
-      "mtime": "2026-09-20T03:34:35.093Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
+      "order": 100
+    },
+    {
+      "file": "tank-battle.html",
+      "rel": "games/tank-battle.html",
+      "url": "games/tank-battle.html",
+      "title": "坦克大战 · 十关战役 | Tank Battle",
+      "desc": "经典坦克大战：守老巢、歼敌军，十关战役任你打，砖墙炸开、道具吃满。",
+      "category": "游戏",
+      "icon": "🎖️",
+      "tags": [
+        "坦克",
+        "射击",
+        "关卡",
+        "经典",
+        "街机"
+      ],
+      "group": "games",
+      "size": 55046,
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 100
     },
     {
@@ -254,7 +254,7 @@ window.__GAMES_INDEX__ = {
       ],
       "group": "games",
       "size": 49021,
-      "mtime": "2026-09-20T03:32:13.239Z",
+      "mtime": "2026-10-11T06:45:56.112Z",
       "order": 20
     }
   ]
